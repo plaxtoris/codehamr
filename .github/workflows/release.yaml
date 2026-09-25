@@ -20,9 +20,9 @@ jobs:
 
       # Gate: TestAssetNameMatchesGoreleaserMatrix here fails the release before
       # publish if assetName and the goreleaser build matrix have drifted. Runs
-      # BEFORE the tag step: tagging first would delete the day's already-
-      # published good release and only then discover the tree doesn't pass,
-      # leaving auto-updaters rolled back to the previous day.
+      # BEFORE the tag step: tagging first would delete the current
+      # published release and only then discover the tree doesn't pass,
+      # leaving auto updaters rolled back to the previous day.
       - name: Test
         run: go test ./...
 
@@ -42,28 +42,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Post-publish guards on the artifacts auto-update actually delivers. They
-      # run after the release is up, so a failure here is a loud signal to re-cut
+      # Post publish guards on the artifacts auto update actually delivers. They
+      # run after the release is up, so a failure here is a loud signal to re cut
       # immediately rather than the silent breakage these two regressions caused:
-      #   1. a dynamic (CGO=1) linux binary that won't exec on musl/old-glibc;
+      #   1. a dynamic (CGO=1) linux binary that won't exec on musl or older glibc;
       #   2. a renamed/reformatted asset assetName can no longer resolve.
       - name: Verify delivered assets are static and consistently named
         run: |
           # Glob goreleaser's real build layout (dist/codehamr_linux_<arch>_*/codehamr);
           # the flat dist/codehamr-linux-<arch> names only exist as release assets,
-          # not on disk, so a hardcoded path would make this guard a silent no-op
-          # (readelf-on-missing-file inside `if` never fails the step).
+          # not on disk, so a hardcoded path would make this guard a silent no operation
+          # (readelf on missing file inside `if` never fails the step).
           found=0
           for f in dist/codehamr_linux_*/codehamr; do
             test -f "$f" || continue
             found=1
             if readelf -d "$f" | grep -q NEEDED; then
-              echo "::error::$f is dynamically linked (CGO leaked on?); it will fail to exec on musl/old-glibc after auto-update"
+              echo "::error::$f is dynamically linked (CGO leaked on?); it will fail to exec on musl or older glibc after an update"
               exit 1
             fi
           done
           if [ "$found" -eq 0 ]; then
-            echo "::error::no linux binaries found under dist/ - guard paths drifted from goreleaser's layout"
+            echo "::error::no linux binaries found under dist/; guard paths drifted from goreleaser's layout"
             exit 1
           fi
           # Absolute path: `go test` runs with CWD set to the package dir, so a

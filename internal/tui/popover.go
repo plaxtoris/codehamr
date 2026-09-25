@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// popoverOpen reports whether the slash-autocomplete popover should render
+// popoverOpen reports whether the slash autocomplete popover should render
 // and consume ↑/↓/Tab/Esc.
 func (m Model) popoverOpen() bool { return m.suggestOpen }
 
@@ -55,11 +55,11 @@ func (m *Model) refreshSuggest() {
 		m.closePopover()
 		return
 	}
-	// Reload cfg on the cmd→arg transition (or a different arg-level command) so
+	// Reload cfg on the cmd→arg transition (or a different arg level command) so
 	// lists like /models <name> reflect external edits before submit. Errors are
 	// silent: runSlash surfaces them on submit, not on every keystroke. Never
-	// mid-turn: a reload can rebuildClient and swap the live client (and zero
-	// the budget) under the in-flight turn; submit is phase-gated anyway, so
+	// mid turn: a reload can rebuildClient and swap the live client
+	// under the in flight turn; submit is phase gated anyway, so
 	// runSlash's own reload covers correctness once the turn is over.
 	if !m.phase.active() && (!m.suggestArgLevel || m.activeCmd != cmdName) {
 		_ = m.reloadConfigFromDisk()
@@ -126,7 +126,7 @@ func (m Model) renderPopover() string {
 	}
 	// Window the rows around the selection: when suggestions exceed popoverCap,
 	// slide start just enough to keep suggestIdx inside [start, start+h). Else
-	// the highlighted row is off-screen and the user commits a row they can't see.
+	// the highlighted row is off screen and the user commits a row they can't see.
 	h := m.popoverHeight()
 	start := 0
 	if m.suggestIdx >= h {

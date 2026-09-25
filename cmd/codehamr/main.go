@@ -18,13 +18,13 @@ import (
 	"github.com/codehamr/codehamr/internal/update"
 )
 
-// updateBudget caps the pre-launch auto-update (checksum fetch + download +
-// rename): enough for the real ~16MB binaries on a slow (few-Mbps) link. A
-// too-tight budget is a permanent every-launch degradation, not a one-off:
+// updateBudget caps the pre launch auto update (checksum fetch + download +
+// rename): enough for the real ~16MB binaries on a slow (few Mbps) link. A
+// too tight budget is a permanent every launch degradation, not a one off:
 // the binary on disk never changes, so each start repeats the stall, the
 // failure banner, and a wasted partial download. Generous is safe because an
 // offline user never gets here (Check's 2s fetchTimeout fails first) and the
-// wait stays Ctrl+C-escapable.
+// wait stays Ctrl+C escapable.
 const updateBudget = 90 * time.Second
 
 // version is injected via -ldflags at build time; "dev" when running `go run`.
@@ -50,12 +50,12 @@ func main() {
 		update.CleanupOld(exe)
 	}
 
-	// Pre-launch auto-update; all failures are non-fatal and fall through to
+	// Pre launch auto update; all failures are non fatal and fall through to
 	// the old binary.
 	maybeSelfUpdate()
 
 	cwd := mustCwd()
-	// created is ignored: any first-run notice printed here is wiped milliseconds
+	// created is ignored: any first run notice printed here is wiped milliseconds
 	// later by the unconditional screen+scrollback clear below, before the TUI
 	// draws, so there's nothing to announce.
 	cfg, _, err := config.Bootstrap(cwd)
@@ -64,7 +64,7 @@ func main() {
 	}
 	applyEnvOverrides(cfg)
 
-	// Opt-in debug log (`logging: true`): truncates .codehamr/log.txt and
+	// Opt in debug log (`logging: true`): truncates .codehamr/log.txt and
 	// records every chat exchange. See tui.OpenDebugLog / dbgWrite.
 	if cfg.Logging {
 		tui.OpenDebugLog(cfg.Dir)
@@ -79,7 +79,7 @@ func main() {
 
 	// Hard clear before the TUI takes over: \x1b[2J viewport, \x1b[3J
 	// scrollback, \x1b[H cursor home, a clean canvas free of prior shell
-	// history. Inline-mode safe: the session's own scrollback still
+	// history. Inline mode safe: the session's own scrollback still
 	// accumulates via tea.Println.
 	os.Stdout.WriteString("\x1b[2J\x1b[3J\x1b[H")
 
@@ -88,7 +88,7 @@ func main() {
 	// scrollback via tea.Println, leaving scrolling/selection/copy to the
 	// terminal.
 	//
-	// WithReportFocus types raw focus-in/out sequences (\x1b[I / \x1b[O) as
+	// WithReportFocus types raw focus in and out sequences (\x1b[I / \x1b[O) as
 	// tea.FocusMsg / tea.BlurMsg so Update can swallow them; otherwise
 	// xterm.js hosts (VS Code) leak those bytes as runes into the textarea
 	// on every window switch, inflating prompt height with invisible chars.
@@ -109,15 +109,16 @@ Slash commands (inside TUI):`))
 	tui.PrintHelp(os.Stdout)
 	fmt.Println(strings.TrimSpace(`
 Keys (inside TUI):
-  ctrl+l   clear the screen (keeps conversation)
+  ctrl+l   clear the prompt and redraw (keeps conversation)
   ctrl+c   cancel running op · press again to quit
-  ctrl+d   quit (on empty input)
+  ctrl+d   quit (on empty input while idle)
 
 Config:
-  .codehamr/config.yaml   per-project settings
+  .codehamr/config.yaml   project settings
 
 Env:
-  CODEHAMR_URL            override the active profile's url at runtime
+  CODEHAMR_URL            override the active profile's URL at runtime
+  CODEHAMR_NO_UPDATE_CHECK  set to 1 to disable GitHub update checks
   CODEHAMR_IDLE_TIMEOUT   stream idle timeout, e.g. 90m or 1h (default 1h)`))
 }
 
@@ -125,23 +126,23 @@ Env:
 // than an official release. `go run` leaves version "dev"; `make install`
 // injects `git describe --tags --always --dirty`, so a dirty tree carries a
 // "-dirty" suffix, a clean tree past the last tag the describe shape
-// (v0.3.0-5-g5290930), and a tag-less clone a bare short sha. All are local:
-// only an exact release tag (v1.2.3) may self-update, or the updater would
+// (v0.3.0-5-g5290930), and a tag less clone a bare short sha. All are local:
+// only an exact release tag (v1.2.3) may self update, or the updater would
 // silently swap unreleased work for the last published release (its hash
 // never matches the manifest, so it always reads as "stale") on first launch.
 func isLocalBuild(version string) bool {
 	if version == "dev" || strings.HasSuffix(version, "-dirty") {
 		return true
 	}
-	// describe-with-commits: anything carrying a "-g<hex>" suffix.
+	// describe with commits: anything carrying a "-g<hex>" suffix.
 	if i := strings.LastIndex(version, "-g"); i >= 0 && isHex(version[i+2:]) {
 		return true
 	}
-	// bare `--always` short sha (tag-less clone): all-hex, no tag structure.
+	// bare `--always` short sha (tag less clone): all hex, no tag structure.
 	return len(version) >= 7 && isHex(version)
 }
 
-// isHex reports whether s is non-empty lowercase hex, the shape of a git
+// isHex reports whether s is nonempty lowercase hex, the shape of a git
 // abbreviated commit hash.
 func isHex(s string) bool {
 	if s == "" {
@@ -155,10 +156,10 @@ func isHex(s string) bool {
 	return true
 }
 
-// maybeSelfUpdate runs the pre-launch auto-update. No-op for local builds,
-// an already-current hash, an unsupported platform (see update.assetName),
+// maybeSelfUpdate runs the pre launch auto update. No operation for local builds,
+// an already current hash, an unsupported platform (see update.assetName),
 // or any network/filesystem refusal. On success it swaps the binary and
-// re-execs via reExec (which only returns on failure). Any failure past
+// re execs via reExec (which only returns on failure). Any failure past
 // "update available" prints one stderr line and proceeds with the old binary.
 func maybeSelfUpdate() {
 	// Skip local builds: hashing a `go run` temp binary against the
@@ -184,19 +185,19 @@ func maybeSelfUpdate() {
 		}
 		return
 	}
-	// Re-launch the new binary. reExec is platform-split: unix execve (same
-	// PID) vs. Windows spawn-and-wait. CODEHAMR_NO_UPDATE_CHECK=1 stops the
-	// replacement run from re-checking its own freshly-written hash. On
-	// reExec failure we fall through to the old in-memory binary.
+	// Relaunch the new binary. reExec is platform split: unix execve (same
+	// PID) vs. Windows spawn and wait. CODEHAMR_NO_UPDATE_CHECK=1 stops the
+	// replacement run from re checking its own freshly written hash. On
+	// reExec failure we fall through to the old in memory binary.
 	if err := reExec(exe, os.Args, reexecEnv()); err != nil {
-		fmt.Fprintf(os.Stderr, "⚠ re-exec failed: %v (continuing with previous version)\n", err)
+		fmt.Fprintf(os.Stderr, "⚠ re exec failed: %v (continuing with previous version)\n", err)
 	}
 }
 
-// reexecEnv arms the update-loop guard and returns the environment for the
-// re-exec'd child. os.Setenv overwrites in place so os.Environ() carries
-// exactly one entry; append(os.Environ(), …) would leave a pre-existing
-// user-set value first, and Unix execve resolves os.Getenv to the FIRST
+// reexecEnv arms the update loop guard and returns the environment for the
+// re exec'd child. os.Setenv overwrites in place so os.Environ() carries
+// exactly one entry; append(os.Environ(), …) would leave a pre existing
+// user set value first, and Unix execve resolves os.Getenv to the FIRST
 // match, silently defeating the guard if someone exported
 // CODEHAMR_NO_UPDATE_CHECK to a non-"1" value.
 func reexecEnv() []string {
@@ -215,8 +216,8 @@ func mustCwd() string {
 }
 
 // applyEnvOverrides folds runtime env vars into cfg. CODEHAMR_URL overrides
-// the active profile's URL (devcontainers / CI), held on a non-serialised
-// field so it never round-trips into config.yaml on Save.
+// the active profile's URL (devcontainers / CI), held on a non serialised
+// field so it never round trips into config.yaml on Save.
 func applyEnvOverrides(cfg *config.Config) {
 	if envURL := os.Getenv("CODEHAMR_URL"); envURL != "" {
 		cfg.URLOverride = envURL

@@ -9,7 +9,7 @@ import (
 )
 
 // TestPromptHistoryRoundTrip: values with newlines/quotes/unicode survive a
-// disk round-trip in append order, the on-disk format must carry any byte the
+// disk round trip in append order, the on disk format must carry any byte the
 // textarea can submit.
 func TestPromptHistoryRoundTrip(t *testing.T) {
 	dir := t.TempDir()
@@ -81,13 +81,13 @@ func TestPromptHistoryClear(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, historyFileName)); !os.IsNotExist(err) {
 		t.Fatalf("history file should be gone, err=%v", err)
 	}
-	// Idempotent: clearing an already-clean dir is a no-op.
+	// Idempotent: clearing an already clean dir is a no operation.
 	if err := clearPromptHistory(dir); err != nil {
 		t.Errorf("second clear must be no-op, got %v", err)
 	}
 }
 
-// TestPromptHistoryCorruptLineSkipped: a malformed line (users may hand-edit
+// TestPromptHistoryCorruptLineSkipped: a malformed line (users may hand edit
 // the file) must not poison the valid entries around it.
 func TestPromptHistoryCorruptLineSkipped(t *testing.T) {
 	dir := t.TempDir()
@@ -102,7 +102,7 @@ func TestPromptHistoryCorruptLineSkipped(t *testing.T) {
 	}
 }
 
-// TestPromptHistoryConcurrentAppendsKeepBoth guards the load-then-rewrite race:
+// TestPromptHistoryConcurrentAppendsKeepBoth guards the load then rewrite race:
 // two instances sharing a project dir would each read N entries and overwrite
 // the whole file, dropping the other's submit. O_APPEND writes only the new
 // line, so both survive.
@@ -144,16 +144,16 @@ func TestPromptHistoryConcurrentAppendsKeepBoth(t *testing.T) {
 	}
 }
 
-// TestPromptHistoryQuotedLineStaysLoadable guards the quote-expansion gap:
+// TestPromptHistoryQuotedLineStaysLoadable guards the quote expansion gap:
 // strconv.Quote expands each control/invalid byte to \xNN (4× growth), so a
-// value gated on its *unquoted* length can still write an on-disk line past
+// value gated on its *unquoted* length can still write an on disk line past
 // loadPromptHistory's scanner buffer. bufio's ErrTooLong then halts the scan,
 // so every *newer* entry vanishes from recall too. The append guard must
 // decline any line the loader can't read back.
 func TestPromptHistoryQuotedLineStaysLoadable(t *testing.T) {
 	dir := t.TempDir()
 	// Clears the unquoted gate (len == cap) but quotes to ~4× the cap, past the
-	// scanner ceiling. Pre-fix this reached disk.
+	// scanner ceiling. Pre fix this reached disk.
 	pathological := strings.Repeat("\x01", historyMaxEntryBytes)
 	if err := appendPromptHistory(dir, pathological); err != nil {
 		t.Fatal(err)
@@ -169,10 +169,10 @@ func TestPromptHistoryQuotedLineStaysLoadable(t *testing.T) {
 			return // invariant held: later entries stay loadable
 		}
 	}
-	t.Fatalf("a later entry was lost - an oversized quoted line halted the load scan; got %d entries", len(got))
+	t.Fatalf("a later entry was lost: an oversized quoted line halted the load scan; got %d entries", len(got))
 }
 
-// TestPromptHistoryRejectsHugeEntry: a multi-MiB paste isn't stored, the load
+// TestPromptHistoryRejectsHugeEntry: a multi MiB paste isn't stored, the load
 // scanner would silently drop it anyway, so declining to write is consistent.
 // Anything sane (a code paragraph, a stack trace) still survives.
 func TestPromptHistoryRejectsHugeEntry(t *testing.T) {
@@ -185,7 +185,7 @@ func TestPromptHistoryRejectsHugeEntry(t *testing.T) {
 	if len(got) != 0 {
 		t.Fatalf("oversized entry should not be saved, got %d", len(got))
 	}
-	// At-the-cap entry still saves.
+	// At the cap entry still saves.
 	atCap := strings.Repeat("y", historyMaxEntryBytes)
 	if err := appendPromptHistory(dir, atCap); err != nil {
 		t.Fatal(err)

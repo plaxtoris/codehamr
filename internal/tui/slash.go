@@ -9,21 +9,20 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/codehamr/codehamr/internal/cloud"
 	"github.com/codehamr/codehamr/internal/config"
 	"github.com/codehamr/codehamr/internal/llm"
 )
 
-// argOption is one popover entry, used at command-level (one row per command)
-// and argument-level (one row per accepted value for the active command).
+// argOption is one popover entry, used at command level (one row per command)
+// and argument level (one row per accepted value for the active command).
 type argOption struct {
 	value       string // what gets inserted / committed
-	description string // right-aligned help text
-	current     bool   // rendered bold; default-selected when the popover opens
+	description string // right aligned help text
+	current     bool   // rendered bold; default selected when the popover opens
 }
 
 // command is one row in the popover, --help, and the dispatch table.
-// args, if non-nil, supplies the argument-level popover entries.
+// args, if nonnil, supplies the argument level popover entries.
 type command struct {
 	name        string
 	description string
@@ -33,17 +32,6 @@ type command struct {
 
 // commands lists every slash command, in popover/--help order. Keep it short.
 var commands = []command{
-	{
-		name:        "/hamrpass",
-		description: "set or show hamrpass key",
-		handler:     (Model).cmdHamrpass,
-		// Live key-entry hint: selecting /hamrpass auto-inserts the trailing
-		// space (handleEnter/handleTab do this whenever args != nil), then the
-		// arg popover renders one synthetic row that validates the key live.
-		// The row's value mirrors the input so HasPrefix always keeps it, and
-		// Enter submits "/hamrpass <key>".
-		args: hamrpassArgHint,
-	},
 	{
 		name:        "/clear",
 		description: "reset the conversation",
@@ -79,9 +67,9 @@ func commandByName(name string) *command {
 	return nil
 }
 
-// runSlash dispatches a slash-prefixed submission; unknown commands produce a
-// quiet hint, not an error. config.yaml is re-read before every slash so
-// hand-edits take effect without a restart (see reloadConfigFromDisk).
+// runSlash dispatches a slash prefixed submission; unknown commands produce a
+// quiet hint, not an error. config.yaml is reread before every slash so
+// hand edits take effect without a restart (see reloadConfigFromDisk).
 func (m Model) runSlash(text string) (tea.Model, tea.Cmd) {
 	if err := m.reloadConfigFromDisk(); err != nil {
 		m.appendLine(styleWarn.Render("⚠ " + err.Error()))
@@ -90,20 +78,20 @@ func (m Model) runSlash(text string) (tea.Model, tea.Cmd) {
 	if c := commandByName(fields[0]); c != nil {
 		return c.handler(m, fields[1:])
 	}
-	m.appendLine(styleWarn.Render("unknown command - type / to see options"))
+	m.appendLine(styleWarn.Render("unknown command: type / to see options"))
 	return m, nil
 }
 
-// reloadConfigFromDisk re-runs config.Bootstrap and replaces m.cfg so hand-edits
+// reloadConfigFromDisk reruns config.Bootstrap and replaces m.cfg so hand edits
 // to config.yaml between slash commands take effect immediately. URLOverride
 // (from CODEHAMR_URL) is carried across the swap so the env var keeps applying.
 //
 // Returns the Bootstrap error verbatim; callers decide whether to surface it
-// (runSlash warns on submit; the popover-refresh path ignores it so a broken
+// (runSlash warns on submit; the popover refresh path ignores it so a broken
 // file doesn't spam a warning on every keystroke).
 //
 // Rebuilds the llm.Client when the active profile's resolved (URL, model, key)
-// triple changed: covers both within-profile edits and a moved active.
+// triple changed: covers both within profile edits and a moved active.
 func (m *Model) reloadConfigFromDisk() error {
 	projectRoot := filepath.Dir(m.cfg.Dir)
 	fresh, _, err := config.Bootstrap(projectRoot)
@@ -125,7 +113,7 @@ func (m *Model) reloadConfigFromDisk() error {
 	return nil
 }
 
-// PrintHelp writes the canonical human-readable command list. Used by --help.
+// PrintHelp writes the canonical human readable command list. Used by --help.
 func PrintHelp(out io.Writer) {
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	for _, c := range commands {
@@ -134,7 +122,7 @@ func PrintHelp(out io.Writer) {
 	w.Flush()
 }
 
-// --- handlers ---------------------------------------------------------------
+// handlers
 
 // cmdModel: `/models` lists, `/models <name>` sets. Cycling is Tab/Shift+Tab
 // in the popover, no separate "next" command.
@@ -165,11 +153,8 @@ func (m *Model) printModelList() {
 	}
 }
 
-// confirmActive emits the activation line for the active profile and returns
-// its reachability cmd. Keyed profiles (cloud) probe: the success line is
-// delayed until the response arrives so it can carry the live ctx window from
-// X-Context-Window. Keyless profiles (local Ollama) ping and print
-// synchronously. Shared by /models and /hamrpass.
+// confirmActive verifies keyed profiles with a small model request. Keyless
+// profiles use a connectivity check without starting inference.
 func (m *Model) confirmActive(profile string) tea.Cmd {
 	p := m.cfg.ActiveProfile()
 	// ActiveURL, not p.URL: under a CODEHAMR_URL override the banner must name
@@ -182,19 +167,14 @@ func (m *Model) confirmActive(profile string) tea.Cmd {
 	return pingBackend(m.cli.BaseURL)
 }
 
-// rebuildClient swaps in a fresh llm.Client for the now-active profile.
+// rebuildClient swaps in a fresh llm.Client for the now active profile.
 // Replacing the pointer (not mutating fields) drops the prior Client's sticky
-// state (noReasoning, keep-alive pool tied to the old URL): new
+// state (noReasoning, keep alive pool tied to the old URL): new
 // endpoint, fresh slate.
 func (m *Model) rebuildClient() {
 	p := m.cfg.ActiveProfile()
 	m.cli = llm.New(m.cfg.ActiveURL(), p.LLM, p.ResolvedKey())
-	// Drop the prior profile's cached BudgetStatus. m.budget has no profile
-	// association, so without this reset the footer keeps rendering the old
-	// "88% pass" segment after switching to a local profile that emits no
-	// X-Budget-* headers (nothing would overwrite it). A fresh BudgetStatus{}
-	// hides the segment until the new backend reports its own.
-	m.budget = cloud.BudgetStatus{}
+
 }
 
 func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
@@ -202,21 +182,21 @@ func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
 	m.scroll.Reset()
 	m.sessionTokens = 0
 	m.streamingEstimate = 0
-	// Drop any queued follow-up: it targeted the conversation just wiped.
+	// Drop any queued follow up: it targeted the conversation just wiped.
 	m.queued = nil
-	// Reset the repeated-failure streak so the next turn starts clean.
+	// Reset the repeated failure streak so the next turn starts clean.
 	m.failKey, m.failStreak = "", 0
 	// The banner offers /clear as one of its two remedies, so clearing must
-	// re-arm it: a re-filled window is a new occurrence, not the same one.
+	// rearm it: a re filled window is a new occurrence, not the same one.
 	m.ctxPressureWarned = false
-	// Wipe prompt recall too: in-memory ring and on-disk .codehamr/history,
+	// Wipe prompt recall too: in memory ring and on disk .codehamr/history,
 	// or leftover history would contradict the "fresh start" promise.
 	m.promptHistory = nil
 	m.histIdx = -1
 	_ = clearPromptHistory(m.cfg.Dir)
 	// Full wipe (unlike Ctrl+L, which redraws but keeps scrollback).
 	// tea.ClearScreen emits \x1b[2J, which only wipes the viewport; the
-	// saved-lines buffer needs eraseScrollback (DECSED 3) too, or old replies
+	// saved lines buffer needs eraseScrollback (DECSED 3) too, or old replies
 	// stay scrollable above the reset line. tea.Sequence keeps the print from
 	// racing past the clear (tea.Batch runs both concurrently and the print
 	// could land first, then get wiped). scroll keeps the line for resize
@@ -226,123 +206,6 @@ func (m Model) cmdClear(_ []string) (tea.Model, tea.Cmd) {
 	m.outbox = nil
 	// Wrap like the outbox drain would: this Println bypasses it (the Sequence
 	// owns the print), and every string handed to tea.Println must be wrapped
-	// or an over-width line drifts the renderer's cursor math.
+	// or an over width line drifts the renderer's cursor math.
 	return m, tea.Sequence(tea.ClearScreen, eraseScrollback, tea.Println(wrapForScrollback(line, m.width)))
-}
-
-// hamrpassMinKeyLen guards against half-pasted keys: real keys clear 16,
-// stray fragments don't.
-const hamrpassMinKeyLen = 16
-
-// hamrpassValidate is the single source of truth for whether a key is
-// acceptable and what the UI says about it. Shared by the inline /hamrpass
-// handler and the arg popover hint. ok=false with an empty trimmed key is the
-// "show status block" signal.
-//
-// Non-printable/non-ASCII runes are rejected up front: http.Header.Set accepts
-// the bytes but http.Client.Do then errors with `invalid header field value
-// for "Authorization"` on the wire, after the key has already been persisted
-// to config.yaml. Real keys are ASCII-printable; reject anything else early.
-func hamrpassValidate(raw string) (key, hint string, ok bool) {
-	key = strings.TrimSpace(raw)
-	switch {
-	case key == "":
-		return "", "paste your hamrpass key, or Enter for status", false
-	case strings.ContainsAny(key, " \t\r\n"):
-		return key, "no whitespace allowed", false
-	}
-	for _, r := range key {
-		if r < 0x21 || r > 0x7e {
-			return key, "key must be printable ASCII (no control chars)", false
-		}
-	}
-	if len(key) < hamrpassMinKeyLen {
-		return key, fmt.Sprintf("%d/%d chars · keep typing", len(key), hamrpassMinKeyLen), false
-	}
-	return key, "Enter to activate", true
-}
-
-// hamrpassArgHint is the args callback for /hamrpass: one synthetic row whose
-// value mirrors the typed argument and whose description carries the live
-// validation hint. Mirroring keeps the row alive: refreshSuggest filters via
-// HasPrefix(value, prefix), and HasPrefix(x, x) is always true.
-func hamrpassArgHint(m Model) []argOption {
-	_, rest, _ := strings.Cut(m.ta.Value(), " ")
-	rest = strings.TrimLeft(rest, " ")
-	_, hint, ok := hamrpassValidate(rest)
-	mark := "· "
-	switch {
-	case ok:
-		mark = "✓ "
-	case rest != "":
-		mark = "✗ "
-	}
-	return []argOption{{value: rest, description: mark + hint}}
-}
-
-// cmdHamrpass: `/hamrpass` shows status + how-to, `/hamrpass <key>` validates,
-// saves the key on the managed hamrpass profile, switches active, and pings the
-// backend. Validation lives in hamrpassValidate so the popover hint and the
-// inline error stay in lockstep.
-func (m Model) cmdHamrpass(args []string) (tea.Model, tea.Cmd) {
-	if len(args) == 0 {
-		m.printHamrpassStatus()
-		return m, nil
-	}
-	if len(args) > 1 {
-		m.appendLine(styleError.Render("⚠ hamrpass keys cannot contain spaces"))
-		return m, nil
-	}
-	key, hint, ok := hamrpassValidate(args[0])
-	if !ok {
-		m.appendLine(styleError.Render("⚠ " + hint))
-		return m, nil
-	}
-	return m, m.activateHamrpass(key)
-}
-
-// printHamrpassStatus emits the status + how-to block (the no-args path).
-func (m *Model) printHamrpassStatus() {
-	hp, ok := m.cfg.Models["hamrpass"]
-	status := "unset"
-	// ResolvedKey, not the raw field: a `${VAR}` reference with the var unset
-	// dials out keyless everywhere else, so reporting the literal reference as
-	// "set" would contradict the 401s the user is about to see.
-	if ok && strings.TrimSpace(hp.ResolvedKey()) != "" {
-		status = "set"
-	}
-	url, llmName := "https://codehamr.com", "hamrpass"
-	if ok {
-		url, llmName = hp.URL, hp.LLM
-	}
-	m.appendLine(styleHamr.Render("hamrpass") + styleDim.Render(" · prepaid pass for the hosted codehamr endpoint"))
-	m.appendLine(styleDim.Render(fmt.Sprintf("  status   : %s", status)))
-	m.appendLine(styleDim.Render(fmt.Sprintf("  endpoint : %s", url)))
-	m.appendLine(styleDim.Render(fmt.Sprintf("  llm      : %s", llmName)))
-	m.appendLine("")
-	m.appendLine("A hamrpass is a prepaid pot of budget for our hosted, agent")
-	m.appendLine("tuned model. No subscription, no expiry, no rate limits. The")
-	m.appendLine("pass simply runs out when the budget is spent. Top up at")
-	m.appendLine("https://codehamr.com.")
-	m.appendLine("")
-	m.appendLine(styleDim.Render("To activate:"))
-	m.appendLine(styleDim.Render("  /hamrpass <your key>            paste here, switches active profile"))
-	m.appendLine(styleDim.Render("  or edit .codehamr/config.yaml   set models.hamrpass.key directly"))
-	m.appendLine("")
-	m.appendLine(styleDim.Render("Once set, the remaining pass percentage appears in the status bar."))
-}
-
-// activateHamrpass writes the key onto the hamrpass profile (seeding the entry
-// if the user removed it from config.yaml), switches active, rebuilds the
-// client, and runs the shared confirmation (probe path, since hamrpass now has
-// a key).
-func (m *Model) activateHamrpass(key string) tea.Cmd {
-	hp := m.cfg.EnsureHamrpass()
-	hp.Key = key
-	if err := m.cfg.SetActive("hamrpass"); err != nil {
-		m.appendLine(styleError.Render("⚠ " + err.Error()))
-		return nil
-	}
-	m.rebuildClient()
-	return m.confirmActive("hamrpass")
 }

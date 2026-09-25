@@ -12,9 +12,9 @@ import (
 // TestEmbeddedPromptFitsFixedSystem guards the invariant the packer relies on:
 // FixedSystem must reserve enough budget for the embedded system prompt PLUS the
 // "\n\nWorking directory: <path>" anchor buildSystem appends. If a prompt edit
-// pushes the embedded text past this, the reservation under-counts and packing
-// silently over-fills the real context, a bug with no other test to catch it.
-// anchorAllowance covers a generously long working-directory path (~384 chars).
+// pushes the embedded text past this, the reservation under counts and packing
+// silently over fills the real context, a bug with no other test to catch it.
+// anchorAllowance covers a generously long working directory path (~384 chars).
 func TestEmbeddedPromptFitsFixedSystem(t *testing.T) {
 	const anchorAllowance = 96 // tokens; "\n\nWorking directory: " + a deep container path
 	used := Tokens(config.DefaultSystemPrompt) + anchorAllowance
@@ -40,8 +40,8 @@ func TestTokensHeuristic(t *testing.T) {
 }
 
 // TestMessageTokensCountsToolCallArguments pins ToolCall.Arguments accounting
-// in Message.Tokens: it feeds the budget on every tool-using turn, yet no
-// other test populates Arguments. Asserts the delta so the +8 per-message
+// in Message.Tokens: it feeds the budget on every tool using turn, yet no
+// other test populates Arguments. Asserts the delta so the +8 per message
 // overhead can't mask a dropped Arguments loop.
 func TestMessageTokensCountsToolCallArguments(t *testing.T) {
 	base := Message{Role: RoleAssistant, ToolCalls: []ToolCall{{Name: "bash"}}}.Tokens()
@@ -94,8 +94,8 @@ func TestTruncateLargeCollapses(t *testing.T) {
 	}
 }
 
-// TestTruncateSnapsToRuneBoundary: Truncate's byte-offset cut must not slice
-// multi-byte runes mid-sequence: output stays valid UTF-8.
+// TestTruncateSnapsToRuneBoundary: Truncate's byte offset cut must not slice
+// multi byte runes mid sequence: output stays valid UTF 8.
 func TestTruncateSnapsToRuneBoundary(t *testing.T) {
 	in := strings.Repeat("ä", 20000) // 2 bytes each, 40000 bytes total = 10000 tokens
 	out := Truncate(in)
@@ -103,7 +103,7 @@ func TestTruncateSnapsToRuneBoundary(t *testing.T) {
 		t.Fatalf("expected truncation marker, got %q", out[:80])
 	}
 	if !utf8.ValidString(out) {
-		t.Fatal("Truncate produced invalid UTF-8 - slice landed mid-rune")
+		t.Fatal("Truncate produced invalid UTF-8: slice landed mid-rune")
 	}
 }
 
@@ -118,7 +118,7 @@ func TestPackNewestFirstWhole(t *testing.T) {
 	r := Pack(history, 2500)
 	// Each message costs Tokens(4000 bytes)+8 = 1008. Budget 2500 keeps newest
 	// (1008) and msg3 (2016 <= 2500), breaks before msg2 (3024 > 2500), so
-	// exactly 2, pinning the `used+cost > budget` break against off-by-one.
+	// exactly 2, pinning the `used+cost > budget` break against off by one.
 	if len(r.Messages) != 2 {
 		t.Fatalf("kept=%d want exactly 2", len(r.Messages))
 	}
@@ -143,9 +143,9 @@ func TestPackAlwaysKeepsNewest(t *testing.T) {
 	}
 }
 
-// TestPackDropsOrphanToolMessage: if budget-trimming cuts the assistant whose
+// TestPackDropsOrphanToolMessage: if budget trimming cuts the assistant whose
 // tool_calls spawned a tool message, that orphan must be dropped, else
-// OpenAI-compat servers 400 with "tool message without preceding tool_calls".
+// OpenAI compat servers 400 with "tool message without preceding tool_calls".
 func TestPackDropsOrphanToolMessage(t *testing.T) {
 	fortyX := strings.Repeat("x", 40)
 	history := []Message{
@@ -154,7 +154,7 @@ func TestPackDropsOrphanToolMessage(t *testing.T) {
 		{Role: RoleAssistant, Content: "reply"},
 	}
 	// Tight enough to drop the first assistant, loose enough that the tool
-	// message would otherwise survive. Tuned against the +8 per-message overhead.
+	// message would otherwise survive. Tuned against the +8 per message overhead.
 	r := Pack(history, 30)
 	for _, m := range r.Messages {
 		if m.Role == RoleTool {
@@ -166,10 +166,10 @@ func TestPackDropsOrphanToolMessage(t *testing.T) {
 	}
 }
 
-// TestPackDropsEmptyIDToolMessages: an empty-ID tool_call must not let
-// subsequent empty-ToolCallID tool messages ride through as "paired". An
+// TestPackDropsEmptyIDToolMessages: an empty ID tool_call must not let
+// subsequent empty ToolCallID tool messages ride through as "paired". An
 // unidentifiable tool message can never be paired, so it's always dropped,
-// else OpenAI-compat backends 400 on the bare tool message.
+// else OpenAI compat backends 400 on the bare tool message.
 func TestPackDropsEmptyIDToolMessages(t *testing.T) {
 	history := []Message{
 		// Malformed assistant with a missing tool_call id (server bug).
@@ -206,9 +206,9 @@ func TestPackKeepsPairedToolMessage(t *testing.T) {
 // result and its owning assistant won't fit the budget, Pack must keep the pair
 // whole rather than drop the lone orphan and collapse to nothing, otherwise the
 // next request carries only the system prompt and silently loses the whole
-// conversation. Reachable on small-ctx profiles after a big tool output.
+// conversation. Reachable on small ctx profiles after a big tool output.
 func TestPackKeepsNewestToolPairOverBudget(t *testing.T) {
-	bigArgs := strings.Repeat("x", 4*5000) // ~5000-token write_file content
+	bigArgs := strings.Repeat("x", 4*5000) // ~5000 token write_file content
 	history := []Message{
 		{Role: RoleUser, Content: "do the thing"},
 		{Role: RoleAssistant, ToolCalls: []ToolCall{
@@ -218,7 +218,7 @@ func TestPackKeepsNewestToolPairOverBudget(t *testing.T) {
 	}
 	r := Pack(history, 500) // far below the assistant's cost
 	if len(r.Messages) == 0 {
-		t.Fatal("Pack collapsed to zero messages - newest tool pair was dropped")
+		t.Fatal("Pack collapsed to zero messages: newest tool pair was dropped")
 	}
 	var sawAssistant, sawTool bool
 	for _, m := range r.Messages {
@@ -236,7 +236,7 @@ func TestPackKeepsNewestToolPairOverBudget(t *testing.T) {
 
 // TestPackKeepsNewestParallelToolGroupOverBudget: with parallel tool calls the
 // tail is [assistant(c1,c2), tool(c1), tool(c2)], so the newest tool's owner is
-// not the immediately-preceding message. Pack must recover the whole group, and
+// not the immediately preceding message. Pack must recover the whole group, and
 // no tool may survive without the assistant that issued its id.
 func TestPackKeepsNewestParallelToolGroupOverBudget(t *testing.T) {
 	bigArgs := strings.Repeat("y", 4*5000)
@@ -251,7 +251,7 @@ func TestPackKeepsNewestParallelToolGroupOverBudget(t *testing.T) {
 	}
 	r := Pack(history, 300)
 	if len(r.Messages) == 0 {
-		t.Fatal("Pack collapsed to zero messages - parallel tool group was dropped")
+		t.Fatal("Pack collapsed to zero messages: parallel tool group was dropped")
 	}
 	ids := map[string]bool{}
 	for _, m := range r.Messages {
@@ -268,9 +268,9 @@ func TestPackKeepsNewestParallelToolGroupOverBudget(t *testing.T) {
 	}
 }
 
-// TestPackRecoveryDropsPartialParallelGroup: the empty-recovery path (newest is
+// TestPackRecoveryDropsPartialParallelGroup: the empty recovery path (newest is
 // a tool result whose owner fell past a tight budget) must not resurrect a
-// partially-answered parallel group as a dangling assistant. owner issued c1,c2
+// partially answered parallel group as a dangling assistant. owner issued c1,c2
 // but only c1 came back; newestToolGroup recovers [assistant(c1,c2), tool(c1)],
 // which must then be stripped to nothing rather than reaching the wire and 400ing.
 func TestPackRecoveryDropsPartialParallelGroup(t *testing.T) {
@@ -294,11 +294,11 @@ func TestPackRecoveryDropsPartialParallelGroup(t *testing.T) {
 	}
 }
 
-// TestPackDropsDanglingAssistantToolCalls: a turn cancelled mid-tool leaves an
+// TestPackDropsDanglingAssistantToolCalls: a turn cancelled mid tool leaves an
 // assistant.tool_calls in history with no answering tool message (the TUI
 // appended it on round close, then endTurn dropped the pending call on Ctrl+C).
 // On the next request Pack must strip that dangling assistant, otherwise the
-// wire carries an unanswered tool_calls and every OpenAI-compat backend 400s.
+// wire carries an unanswered tool_calls and every OpenAI compat backend 400s.
 func TestPackDropsDanglingAssistantToolCalls(t *testing.T) {
 	history := []Message{
 		{Role: RoleUser, Content: "run a long thing"},
@@ -321,7 +321,7 @@ func TestPackDropsDanglingAssistantToolCalls(t *testing.T) {
 // TestPackDropsDanglingPartialParallelGroup: cancelling a parallel round after
 // only some results return leaves assistant(c1,c2)+tool(c1). The assistant has
 // an unanswered call (c2), so it must be dropped, and dropOrphanTools must then
-// clean up the now-orphaned tool(c1).
+// clean up the now orphaned tool(c1).
 func TestPackDropsDanglingPartialParallelGroup(t *testing.T) {
 	history := []Message{
 		{Role: RoleUser, Content: "do two things"},
@@ -343,14 +343,14 @@ func TestPackDropsDanglingPartialParallelGroup(t *testing.T) {
 }
 
 // TestPackDropsDanglingAssistantDespiteIDReuse: pairing is positional, not a
-// global ID lookup. Local backends commonly reuse index-derived IDs ("call_0")
+// global ID lookup. Local backends commonly reuse index derived IDs ("call_0")
 // across turns, so a later turn's answered call must not vouch for an earlier
-// turn's aborted (dangling) assistant - that shape reaches the wire and 400s
+// turn's aborted (dangling) assistant: that shape reaches the wire and 400s
 // every backend ("missing tool response") until /clear.
 func TestPackDropsDanglingAssistantDespiteIDReuse(t *testing.T) {
 	history := []Message{
 		{Role: RoleUser, Content: "task"},
-		// Turn 1: aborted mid-tool (Ctrl+C); call_0 never answered.
+		// Turn 1: aborted mid tool (Ctrl+C); call_0 never answered.
 		{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "call_0", Name: "bash"}}},
 		// Turn 2: the backend reuses call_0; this exchange is complete.
 		{Role: RoleUser, Content: "again"},
@@ -374,13 +374,13 @@ func TestPackDropsDanglingAssistantDespiteIDReuse(t *testing.T) {
 	}
 }
 
-// TestPackRecoversNewestToolGroupPastTrailingNudge: the over-budget recovery
+// TestPackRecoversNewestToolGroupPastTrailingNudge: the over budget recovery
 // for the newest tool exchange must fire even when a failure/runaway nudge was
 // appended after the tool result. The nudge survives the budget walk as the
 // sole keeper, so a bare emptiness check would see "something survived" and
 // silently lose the current turn's exchange from the window.
 func TestPackRecoversNewestToolGroupPastTrailingNudge(t *testing.T) {
-	bigArgs := strings.Repeat("x", 4*5000) // ~5000-token write_file content
+	bigArgs := strings.Repeat("x", 4*5000) // ~5000 token write_file content
 	history := []Message{
 		{Role: RoleUser, Content: "do the thing"},
 		{Role: RoleAssistant, ToolCalls: []ToolCall{
@@ -414,10 +414,10 @@ func TestPackRecoversNewestToolGroupPastTrailingNudge(t *testing.T) {
 }
 
 // TestPackRecoversNewestToolGroupPastEmptyAssistantTail: the stall shape the
-// empty-reply nudge answers appends an EMPTY assistant message, then the
-// nudge, after the tool result. Both are non-substantive; if the cheap empty
+// empty reply nudge answers appends an EMPTY assistant message, then the
+// nudge, after the tool result. Both are non substantive; if the cheap empty
 // assistant (8 tokens) survives the walk it must not mask the recovery, or
-// the wire tells the model to "re-issue the call" it can no longer see.
+// the wire tells the model to "reissue the call" it can no longer see.
 func TestPackRecoversNewestToolGroupPastEmptyAssistantTail(t *testing.T) {
 	bigArgs := strings.Repeat("x", 4*5000)
 	history := []Message{
@@ -427,7 +427,7 @@ func TestPackRecoversNewestToolGroupPastEmptyAssistantTail(t *testing.T) {
 		}},
 		{Role: RoleTool, ToolCallID: "c1", Content: strings.Repeat("y", 4*3000)},
 		{Role: RoleAssistant, Content: ""}, // the stall
-		{Role: RoleSystem, Content: "nudge: re-issue the call"},
+		{Role: RoleSystem, Content: "nudge: reissue the call"},
 	}
 	r := Pack(history, 2000)
 	var hasOwner, hasTool bool
@@ -447,7 +447,7 @@ func TestPackRecoversNewestToolGroupPastEmptyAssistantTail(t *testing.T) {
 
 // TestPackDropsStrayToolResultDespiteIDReuse: dropOrphanTools is positional
 // too. A stray tool result whose own (dangling, dropped) assistant reused an
-// older turn's ID must not survive via that older assistant's issuance - it
+// older turn's ID must not survive via that older assistant's issuance: it
 // would land right after a user message and 400 strict backends.
 func TestPackDropsStrayToolResultDespiteIDReuse(t *testing.T) {
 	history := []Message{
@@ -475,7 +475,7 @@ func TestPackDropsStrayToolResultDespiteIDReuse(t *testing.T) {
 	}
 }
 
-// TestPackKeepsFullyAnsweredToolCalls: don't over-reach. An assistant whose
+// TestPackKeepsFullyAnsweredToolCalls: don't over reach. An assistant whose
 // every tool_call is answered (including parallel) must survive intact.
 func TestPackKeepsFullyAnsweredToolCalls(t *testing.T) {
 	history := []Message{
@@ -494,11 +494,11 @@ func TestPackKeepsFullyAnsweredToolCalls(t *testing.T) {
 
 // TestPackAnchorsUserTaskOverBudget: a long single turn (one small task message,
 // then many large assistant rounds that fill the budget) would let the
-// newest-first walk evict the sole user task, leaving a userless window that
-// 400s every OpenAI-compat backend ("no user query found in messages"). Pack
-// must re-anchor the original task over budget so the wire always carries it.
+// newest first walk evict the sole user task, leaving a userless window that
+// 400s every OpenAI compat backend ("no user query found in messages"). Pack
+// must re anchor the original task over budget so the wire always carries it.
 func TestPackAnchorsUserTaskOverBudget(t *testing.T) {
-	big := strings.Repeat("x", 4*3000) // ~3000-token assistant chunk
+	big := strings.Repeat("x", 4*3000) // ~3000 token assistant chunk
 	history := []Message{
 		{Role: RoleUser, Content: "BUILD THE GALAXY"},
 		{Role: RoleAssistant, Content: big},
@@ -521,12 +521,12 @@ func TestPackAnchorsUserTaskOverBudget(t *testing.T) {
 	}
 }
 
-// TestPackNoStaleAnchorWhenRecentUserSurvives: in a normal multi-turn chat a
+// TestPackNoStaleAnchorWhenRecentUserSurvives: in a normal multi turn chat a
 // recent user message already survives the walk, so Pack must NOT also drag the
-// stale first message back in: anchoring is a userless-window fallback, not an
-// always-pin. Guards the anchor against over-reach.
+// stale first message back in: anchoring is a userless window fallback, not an
+// always pin. Guards the anchor against over reach.
 func TestPackNoStaleAnchorWhenRecentUserSurvives(t *testing.T) {
-	bigStale := strings.Repeat("y", 4*2000) // ~2000-token first task, evicted by the walk
+	bigStale := strings.Repeat("y", 4*2000) // ~2000 token first task, evicted by the walk
 	history := []Message{
 		{Role: RoleUser, Content: "STALE FIRST TASK" + bigStale},
 		{Role: RoleAssistant, Content: strings.Repeat("z", 4*500)},
@@ -553,24 +553,24 @@ func TestPackNoStaleAnchorWhenRecentUserSurvives(t *testing.T) {
 	}
 }
 
-// TestPackDemotesSystemNudgeToUser: the four soft-nudge backstops append a
-// system-role note to history. buildMessages prepends the embedded system prompt
+// TestPackDemotesSystemNudgeToUser: the four soft nudge backstops append a
+// system role note to history. buildMessages prepends the embedded system prompt
 // as wire element 0, so any system message Pack returns reaches the wire as a
-// SECOND, non-leading system message, which strict OpenAI-compat backends reject
+// SECOND, non leading system message, which strict OpenAI compat backends reject
 // outright ("System message must be at the beginning"; observed on strict
 // backends like Ollama and llama.cpp). The only system content in history is a nudge, so Pack
-// must demote it to a user message: the note (automated-check prefix and all)
+// must demote it to a user message: the note (automated check prefix and all)
 // stays in front of the model and the wire stays legal on every backend.
 func TestPackDemotesSystemNudgeToUser(t *testing.T) {
 	history := []Message{
 		{Role: RoleUser, Content: "build it"},
 		{Role: RoleAssistant, Content: "working"},
-		{Role: RoleSystem, Content: "[Automated codehamr check - not a message from your user.] runaway self-check"},
+		{Role: RoleSystem, Content: "[Automated codehamr check: not a message from your user.] runaway self-check"},
 	}
 	r := Pack(history, 100000)
 	for _, m := range r.Messages {
 		if m.Role == RoleSystem {
-			t.Fatalf("system message survived Pack - would 400 a strict backend: %+v", r.Messages)
+			t.Fatalf("system message survived Pack: would 400 a strict backend: %+v", r.Messages)
 		}
 	}
 	last := r.Messages[len(r.Messages)-1]
@@ -582,8 +582,8 @@ func TestPackDemotesSystemNudgeToUser(t *testing.T) {
 // TestPackAnchorsTaskEvenWithSystemNudge: a long single turn evicts the sole user
 // task, and a nudge (system) is the newest message. The system→user demotion must
 // run AFTER anchorUserMessage, otherwise the demoted nudge masquerades as a
-// surviving user message, anchorUserMessage no-ops, and the wire loses the
-// original task. The real first user task must still be re-anchored.
+// surviving user message, anchorUserMessage no operations, and the wire loses the
+// original task. The real first user task must still be re anchored.
 func TestPackAnchorsTaskEvenWithSystemNudge(t *testing.T) {
 	big := strings.Repeat("x", 4*3000)
 	history := []Message{
@@ -609,12 +609,12 @@ func TestPackAnchorsTaskEvenWithSystemNudge(t *testing.T) {
 
 func TestBudget(t *testing.T) {
 	// Reference the constants directly so a future FixedSystem/FixedTools/headroom
-	// tweak doesn't trip a magic-number mismatch absent a real regression.
+	// tweak doesn't trip a magic number mismatch absent a real regression.
 	// 65k: ctxSize/8 = 8192, just above the 8k floor.
 	if raw := 65536 - FixedSystem - FixedTools - 8192; Budget(65536) != raw-raw/budgetHeadroomDivisor {
 		t.Fatalf("budget wrong at 65k: %d", Budget(65536))
 	}
-	// 262k: ctxSize/8 = 32768, matches a common thinking-mode default.
+	// 262k: ctxSize/8 = 32768, matches a common thinking mode default.
 	if raw := 262144 - FixedSystem - FixedTools - 32768; Budget(262144) != raw-raw/budgetHeadroomDivisor {
 		t.Fatalf("budget wrong at 262k: %d", Budget(262144))
 	}
@@ -634,7 +634,7 @@ func TestResponseReserveScales(t *testing.T) {
 		{64_000, 8000},    // floor: ctxSize/8 = 8000, not >
 		{65_536, 8192},    // just above the floor
 		{128_000, 16_000}, // linear
-		{262_144, 32_768}, // common thinking-mode default
+		{262_144, 32_768}, // common thinking mode default
 		{1_000_000, 125_000},
 	}
 	for _, c := range cases {

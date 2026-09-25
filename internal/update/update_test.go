@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// fakeRelease serves a goreleaser-style manifest plus one binary asset;
+// fakeRelease serves a goreleaser style manifest plus one binary asset;
 // tests plug its URL into the package vars via withReleaseURLs.
 type fakeRelease struct {
 	srv      *httptest.Server
@@ -109,7 +109,7 @@ func TestApplyRejectsChecksumMismatch(t *testing.T) {
 // the running binary is moved aside to execPath+".old", then the promote
 // rename fails. Without the restore the user is left with NO executable at
 // execPath. Driven through the promoteRename seam (the one step we can't make
-// fail deterministically and root-safely via the filesystem); the restore
+// fail deterministically and root safely via the filesystem); the restore
 // uses real os.Rename, so this asserts recovery actually happens.
 func TestApplyRestoresBinaryWhenPromoteFails(t *testing.T) {
 	asset := platformAsset(t)
@@ -135,19 +135,19 @@ func TestApplyRestoresBinaryWhenPromoteFails(t *testing.T) {
 	// The original binary must be restored from .old, not left missing.
 	got, readErr := os.ReadFile(exec)
 	if readErr != nil {
-		t.Fatalf("execPath is gone after a failed promote - user left with no binary: %v", readErr)
+		t.Fatalf("execPath is gone after a failed promote: user left with no binary: %v", readErr)
 	}
 	if string(got) != originalBytes {
 		t.Fatalf("execPath not restored to the original binary: got %q", got)
 	}
-	// No half-written temp file should leak.
+	// No half written temp file should leak.
 	if matches, _ := filepath.Glob(filepath.Join(tmpDir, ".codehamr-update-*")); len(matches) != 0 {
 		t.Fatalf("temp file leaked after failed promote: %+v", matches)
 	}
 }
 
-// TestApplyReportsRestoreFailure covers the doubly-bad path: the promote
-// rename fails AND the restore of the moved-aside binary also fails. Apply
+// TestApplyReportsRestoreFailure covers the doubly bad path: the promote
+// rename fails AND the restore of the moved aside binary also fails. Apply
 // must surface the restore failure (not just the promote one) so the message
 // reflects reality: execPath is now empty. Forced by occupying execPath with
 // a directory inside the seam, so the restore os.Rename hits EISDIR.
@@ -164,7 +164,7 @@ func TestApplyReportsRestoreFailure(t *testing.T) {
 	}
 
 	orig := promoteRename
-	// Occupy the now-vacant execPath with a directory so the restore can't succeed.
+	// Occupy the now vacant execPath with a directory so the restore can't succeed.
 	promoteRename = func(_, to string) error {
 		_ = os.Mkdir(to, 0o755)
 		return fmt.Errorf("simulated promote failure")
@@ -243,7 +243,7 @@ func TestApplyRejectsMissingManifestEntry(t *testing.T) {
 }
 
 // TestApplyCleansTempOnFailure: a failed download (server returns 500)
-// must not leave a half-written temp file in the install directory.
+// must not leave a half written temp file in the install directory.
 func TestApplyCleansTempOnFailure(t *testing.T) {
 	asset := platformAsset(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -291,7 +291,7 @@ func TestFetchHashHandlesCorruptManifest(t *testing.T) {
 	}
 }
 
-// TestCheckHonoursEnvDisableFlag: CODEHAMR_NO_UPDATE_CHECK=1 must short-circuit
+// TestCheckHonoursEnvDisableFlag: CODEHAMR_NO_UPDATE_CHECK=1 must short circuit
 // Check before any HTTP work, sparing CI/offline launches the fetch deadline.
 func TestCheckHonoursEnvDisableFlag(t *testing.T) {
 	t.Setenv("CODEHAMR_NO_UPDATE_CHECK", "1")
@@ -302,7 +302,7 @@ func TestCheckHonoursEnvDisableFlag(t *testing.T) {
 
 // TestAssetNameCoversEveryReleasedPlatform: every goos/goarch goreleaser
 // publishes a binary for MUST be reachable from assetName. A missing case
-// silently locks that platform out of auto-updates (Check false → no fetch →
+// silently locks that platform out of auto updates (Check false → no fetch →
 // no update, zero signal). This table mirrors the six published checksum rows.
 func TestAssetNameCoversEveryReleasedPlatform(t *testing.T) {
 	cases := []struct {
@@ -318,7 +318,7 @@ func TestAssetNameCoversEveryReleasedPlatform(t *testing.T) {
 	for _, c := range cases {
 		got, ok := assetName(c.goos, c.goarch)
 		if !ok {
-			t.Errorf("%s/%s: assetName returned ok=false - every platform goreleaser publishes a binary for must be reachable, or releases are silently broken for that platform", c.goos, c.goarch)
+			t.Errorf("%s/%s: assetName returned ok=false: every platform goreleaser publishes a binary for must be reachable, or releases are silently broken for that platform", c.goos, c.goarch)
 			continue
 		}
 		if got != c.want {
@@ -328,7 +328,7 @@ func TestAssetNameCoversEveryReleasedPlatform(t *testing.T) {
 }
 
 // TestAssetNameRejectsUnreleasedPlatform: the inverse, anything goreleaser
-// doesn't build for must return ok=false so Check short-circuits before the
+// doesn't build for must return ok=false so Check short circuits before the
 // network, instead of leading Apply down a confusing path on a 404.
 func TestAssetNameRejectsUnreleasedPlatform(t *testing.T) {
 	cases := [][2]string{
@@ -342,13 +342,13 @@ func TestAssetNameRejectsUnreleasedPlatform(t *testing.T) {
 	}
 	for _, c := range cases {
 		if asset, ok := assetName(c[0], c[1]); ok {
-			t.Errorf("%s/%s: assetName returned ok=true with %q - goreleaser doesn't publish for this combo, Apply would 404", c[0], c[1], asset)
+			t.Errorf("%s/%s: assetName returned ok=true with %q: goreleaser doesn't publish for this combo, Apply would 404", c[0], c[1], asset)
 		}
 	}
 }
 
 // TestCheckReportsUpToDate: local hash matches the manifest → Check returns
-// false. The steady-state path that keeps the spinner quiet after a release.
+// false. The steady state path that keeps the spinner quiet after a release.
 func TestCheckReportsUpToDate(t *testing.T) {
 	asset := platformAsset(t)
 	tmpDir := t.TempDir()
@@ -384,11 +384,11 @@ func TestCheckReportsStale(t *testing.T) {
 	}
 }
 
-// TestApplyKeepsPreviousBinaryAsOld is the cross-platform-parity guard: Apply
+// TestApplyKeepsPreviousBinaryAsOld is the cross platform parity guard: Apply
 // must rename execPath aside to execPath+".old" before moving the new download
 // in, never replace it directly. Windows requires this (MoveFileEx with
 // REPLACE_EXISTING fails against a running .exe's sharing lock), and the same
-// rename-aside on linux/macos keeps the flow identical everywhere. CleanupOld
+// rename aside on linux/macos keeps the flow identical everywhere. CleanupOld
 // deletes the stale .old on the next launch.
 func TestApplyKeepsPreviousBinaryAsOld(t *testing.T) {
 	asset := platformAsset(t)
@@ -447,10 +447,10 @@ func TestCleanupOldNoopWhenMissing(t *testing.T) {
 	CleanupOld(exec) // must not panic, must not log
 }
 
-// TestCleanupOldSweepsOrphanedTempFiles: a Ctrl+C mid-download kills the
+// TestCleanupOldSweepsOrphanedTempFiles: a Ctrl+C mid download kills the
 // process before Apply's deferred Remove runs (no signal handler exists that
-// early), stranding a multi-MB .codehamr-update-* partial; each retry uses a
-// fresh random suffix, so only a launch-time sweep ever deletes them. Only
+// early), stranding a multi MB .codehamr-update-* partial; each retry uses a
+// fresh random suffix, so only a launch time sweep ever deletes them. Only
 // STALE temps are swept: a fresh one may be another instance's live download.
 // The running binary and unrelated files must survive.
 func TestCleanupOldSweepsOrphanedTempFiles(t *testing.T) {

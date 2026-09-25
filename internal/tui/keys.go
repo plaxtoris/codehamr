@@ -7,14 +7,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// quitArmText is the status-bar hint after the first idle Ctrl+C; a const so
+// quitArmText is the status bar hint after the first idle Ctrl+C; a const so
 // the arm/disarm sites compare against the same string.
 const quitArmText = "press Ctrl+C again to quit"
 
-// queueSlashHint is the status-bar hint when queuePrompt refuses to join a
+// queueSlashHint is the status bar hint when queuePrompt refuses to join a
 // slash command with a queued prompt; a const so endTurn can clear exactly
 // this hint once the turn ends and the advice is obsolete.
-const queueSlashHint = "a slash command can't join a queued prompt - send it when the turn ends"
+const queueSlashHint = "a slash command can't join a queued prompt: send it when the turn ends"
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Any key that isn't Ctrl+C clears a pending quit arm: no stray quits.
@@ -36,18 +36,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.closePopover()
 		return m, tea.ClearScreen
 	case tea.KeyBackspace:
-		// Mid-turn Backspace on an empty prompt pulls a queued prompt back into
+		// Mid turn Backspace on an empty prompt pulls a queued prompt back into
 		// the textarea for editing; any other Backspace is an ordinary character
 		// delete and falls through to the textarea.
 		if m.phase.active() && m.queued != nil && m.ta.Value() == "" {
 			return m.unqueuePrompt()
 		}
 	case tea.KeyCtrlD:
-		// Ctrl+D on empty input = EOF = quit; no-op on non-empty so a
-		// reflexive press never destroys a draft, and no-op mid-turn (the
+		// Ctrl+D on empty input = EOF = quit; no operation on nonempty so a
+		// reflexive press never destroys a draft, and no operation mid turn (the
 		// textarea is empty then, since submit resets it) so a reflexive press
 		// can't quit without cancelling turnCtx and orphan a running tool's
-		// process group. Ctrl+C is the mid-turn escape.
+		// process group. Ctrl+C is the mid turn escape.
 		if m.ta.Value() == "" && !m.phase.active() {
 			return m, tea.Quit
 		}
@@ -56,7 +56,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.popoverOpen() {
 			return m.popoverMoveSelection(-1)
 		}
-		// ↑ is prompt-only: cursor up if a row is above, else walk
+		// ↑ is prompt only: cursor up if a row is above, else walk
 		// history. The terminal owns scrollback (PgUp / wheel native).
 		if !m.cursorOnFirstLine() {
 			break
@@ -99,20 +99,20 @@ func (m Model) forwardToTextarea(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // setPromptText overwrites the textarea, parks the cursor at the end, and
 // refreshes the popover. Centralises the SetValue + CursorEnd + refreshSuggest
-// dance shared by Tab completion and the Enter/Esc arg-popover transitions.
+// dance shared by Tab completion and the Enter/Esc arg popover transitions.
 func (m *Model) setPromptText(s string) {
 	m.ta.SetValue(s)
 	m.ta.CursorEnd()
 	m.refreshSuggest()
 }
 
-// handleCtrlC implements Ctrl+C's three-level precedence: in-flight cancel >
+// handleCtrlC implements Ctrl+C's three level precedence: in flight cancel >
 // popover close > quit arming. Each level fully handles the key, no fallthrough.
 func (m Model) handleCtrlC() (tea.Model, tea.Cmd) {
 	if m.cancel != nil {
 		// abortTurn flushes the partial block so streamed output stays
 		// visible, drains turn stats for a clean next banner, then unwinds
-		// the per-turn context.
+		// the per turn context.
 		dbgWritef("cancel", "user cancelled the turn (Ctrl+C)")
 		m.abortTurn(styleWarn.Render("✗ cancelled"))
 		m.quitArmedAt = time.Time{}
@@ -133,8 +133,8 @@ func (m Model) handleCtrlC() (tea.Model, tea.Cmd) {
 	return m, tea.Tick(3*time.Second, func(time.Time) tea.Msg { return quitArmResetMsg{} })
 }
 
-// historyUp walks one step toward older entries; caller gates on cursor-on-
-// first-line and popover closed. Empty history is a no-op.
+// historyUp walks one step toward older entries; caller gates on cursor on
+// first line and popover closed. Empty history is a no operation.
 func (m Model) historyUp() Model {
 	if len(m.promptHistory) == 0 {
 		return m
@@ -167,8 +167,8 @@ func (m Model) historyDown() Model {
 
 // handleTab implements the three Tab behaviours: seed "/" on an empty prompt
 // (opens the command popover), complete a unique match when the popover is
-// open, or cycle the selection. Non-empty non-popover Tabs fall through to the
-// textarea so a user-initiated indent isn't swallowed.
+// open, or cycle the selection. Nonempty non popover Tabs fall through to the
+// textarea so a user initiated indent isn't swallowed.
 func (m Model) handleTab(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if !m.popoverOpen() {
 		if m.ta.Value() == "" {
@@ -197,7 +197,7 @@ func (m Model) handleTab(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleEscInPopover() (tea.Model, tea.Cmd) {
 	if m.suggestArgLevel {
 		// Drop the trailing space and any typed arg prefix so refreshSuggest
-		// lands on the command-level list filtered to the command we were in.
+		// lands on the command level list filtered to the command we were in.
 		cmdName, _, _ := strings.Cut(m.ta.Value(), " ")
 		m.setPromptText(cmdName)
 		return m, nil
@@ -207,22 +207,22 @@ func (m Model) handleEscInPopover() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleEnter implements the four-way Enter dispatch. Alt+Enter inserts a
-// newline; mid-turn Enter queues the prompt (queuePrompt); command-level Enter
-// on an args-taking command advances to the arg popover (same model as Tab);
+// handleEnter implements the four way Enter dispatch. Alt+Enter inserts a
+// newline; mid turn Enter queues the prompt (queuePrompt); command level Enter
+// on an args taking command advances to the arg popover (same model as Tab);
 // plain Enter commits.
 func (m Model) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.Alt {
 		// Strip the Alt flag before forwarding: the textarea's InsertNewline
-		// binding matches "enter", and an alt-flagged KeyEnter ("alt+enter")
-		// matches no binding at all, falling through to a rune-insert no-op.
+		// binding matches "enter", and an alt flagged KeyEnter ("alt+enter")
+		// matches no binding at all, falling through to a rune insert no operation.
 		return m.forwardToTextarea(tea.KeyMsg{Type: tea.KeyEnter})
 	}
 	if m.phase.active() {
 		return m.queuePrompt()
 	}
 	sel, hasSel := m.currentSuggestion()
-	// Command-level Enter on an args-taking command advances to the arg
+	// Command level Enter on an args taking command advances to the arg
 	// popover (same shape as Tab on a unique match).
 	if hasSel && !m.suggestArgLevel {
 		if c := commandByName(sel.value); c != nil && c.args != nil {
@@ -257,11 +257,11 @@ func (m Model) handleEnter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.submit(sendText, echoText, entry)
 }
 
-// queuePrompt stashes the textarea contents to auto-submit when the running turn
+// queuePrompt stashes the textarea contents to auto submit when the running turn
 // finishes (see fireQueued), then clears the input so the next prompt can be
-// typed. A second call appends newline-joined, so a multi-part instruction builds
-// up in one slot and fires as a single turn. Empty input is a no-op, so a
-// reflexive mid-turn Enter stays silent as it always did. Value() feeds the LLM
+// typed. A second call appends newline joined, so a multi part instruction builds
+// up in one slot and fires as a single turn. Empty input is a no operation, so a
+// reflexive mid turn Enter stays silent as it always did. Value() feeds the LLM
 // (chips expanded), DisplayValue() the visible echo (chips collapsed), the same
 // split submit uses. Slash text queues like any prompt and routes through submit
 // when it fires.
@@ -274,17 +274,17 @@ func (m Model) queuePrompt() (tea.Model, tea.Cmd) {
 	if m.queued == nil {
 		m.queued = &queuedPrompt{send: send, echo: echo}
 	} else {
-		// Never newline-join across a slash boundary. The joined text either
-		// starts with "/" and fires as ONE slash command whose Fields-split
+		// Never newline join across a slash boundary. The joined text either
+		// starts with "/" and fires as ONE slash command whose Fields split
 		// swallows the appended prose as bogus args (a queued "/clear" plus a
-		// follow-up instruction wipes the conversation and silently drops the
+		// follow up instruction wipes the conversation and silently drops the
 		// instruction), or it ships the slash line to the LLM as prose. Refuse
 		// the append and keep the draft in the textarea so nothing is lost.
 		if strings.HasPrefix(m.queued.send, "/") || strings.HasPrefix(send, "/") {
 			m.status = queueSlashHint
 			return m, nil
 		}
-		// A fresh pointer, not an in-place edit: Model is copied by value across
+		// A fresh pointer, not an in place edit: Model is copied by value across
 		// bubbletea, so mutating *m.queued would also reach through the discarded
 		// prior copy that still aliases the same struct.
 		m.queued = &queuedPrompt{
@@ -298,7 +298,7 @@ func (m Model) queuePrompt() (tea.Model, tea.Cmd) {
 }
 
 // unqueuePrompt pulls the queued prompt back into the textarea and clears the
-// slot, so a queued follow-up can be edited or dropped with one Backspace.
+// slot, so a queued follow up can be edited or dropped with one Backspace.
 // Reversible counterpart to queuePrompt; Ctrl+C still cancels the turn, a
 // separate concern. The expanded text returns (no chip), content intact.
 func (m Model) unqueuePrompt() (tea.Model, tea.Cmd) {

@@ -1,4 +1,4 @@
-// Debug instrumentation, self-contained so it can be ripped out cleanly.
+// Debug instrumentation, self contained so it can be ripped out cleanly.
 // Activated by `logging: true` in config.yaml; log.txt is truncated on
 // every start so a session never appends onto a stale run.
 package tui
@@ -24,9 +24,8 @@ var (
 // it reports once on stderr and disables logging: the log must never block
 // the TUI from starting.
 //
-// 0o600 because the log captures every prompt: /hamrpass <key> and bash args
-// can carry secrets even past the slash redaction below. Owner-only is the
-// only honest answer.
+// Prompts and tool arguments can contain secrets. Only the owner should
+// have permission to read the log.
 func OpenDebugLog(dir string) {
 	if dir == "" {
 		return
@@ -53,38 +52,16 @@ func CloseDebugLog() {
 	}
 }
 
-// redactSlash strips the /hamrpass <key> bearer token before it lands in any
-// log. A central hook covers any future secret-bearing command from one place.
-//
-// The split mirrors runSlash's strings.Fields: both must agree on command vs.
-// args, else a multi-line `/hamrpass\n<key>` (Alt+Enter inserts a literal
-// newline) activates via runSlash but slips a literal-space prefix match here,
-// leaking the verbatim key.
-//
-// Case-folded on purpose: a mistyped /HamrPass won't activate (dispatch is
-// case-sensitive) but its token would still reach scrollback, recall ring,
-// history, and log.txt, so redaction errs wider than dispatch, the safe way.
-func redactSlash(line string) string {
-	fields := strings.Fields(line)
-	if len(fields) == 0 || !strings.EqualFold(fields[0], "/hamrpass") {
-		return line
-	}
-	if len(fields) == 1 {
-		return line // no key portion to redact
-	}
-	return "/hamrpass <redacted>"
-}
-
 // dbgEnabled reports whether logging is on. Callers use it to skip building
 // expensive log payloads (e.g. accumulating a round's reasoning) when the log
-// is off. dbgWritef itself is already a no-op, but the work feeding it isn't.
+// is off. dbgWritef itself is already a no operation, but the work feeding it isn't.
 func dbgEnabled() bool {
 	dbgMu.Lock()
 	defer dbgMu.Unlock()
 	return dbgFile != nil
 }
 
-// dbgWritef appends one timestamped record. No-op when logging is off. The
+// dbgWritef appends one timestamped record. No operation when logging is off. The
 // timestamp carries the date too (not just the clock) so a shared log is
 // unambiguous across day boundaries and correlatable with other tooling.
 func dbgWritef(category, format string, args ...any) {
@@ -102,7 +79,7 @@ func dbgWritef(category, format string, args ...any) {
 // Behaviour differs sharply by model (different model families fail in
 // different ways) and by context window, so a shared log must name exactly what
 // produced it. The system prompt itself isn't dumped: it's the embedded
-// PROMPT_SYS.md plus the working-dir anchor, both reconstructable from the repo;
+// PROMPT_SYS.md plus the working dir anchor, both reconstructable from the repo;
 // only its size (which feeds the packing budget) is worth recording.
 func dbgWriteSession(version, profile, model, url string, ctxSize, sysTokens int, tools []string) {
 	dbgWritef("session",
@@ -110,12 +87,12 @@ func dbgWriteSession(version, profile, model, url string, ctxSize, sysTokens int
 		version, profile, model, url, ctxSize, sysTokens, strings.Join(tools, ", "))
 }
 
-// dbgWriteRequest records, per LLM round, what newest-first packing actually
+// dbgWriteRequest records, per LLM round, what newest first packing actually
 // sent: how much of history survived the budget and how many tool outputs are
 // truncated. The message bodies are already captured as user/assistant/
-// tool_result records, so this logs only the packing decisions those per-message
+// tool_result records, so this logs only the packing decisions those per message
 // records cannot show: what the model saw versus what was dropped. packed
-// includes the prepended system message; historyLen is the pre-pack history.
+// includes the prepended system message; historyLen is the pre pack history.
 func dbgWriteRequest(model string, ctxSize, budget, historyLen int, packed []chmctx.Message) {
 	if !dbgEnabled() {
 		return
@@ -124,7 +101,7 @@ func dbgWriteRequest(model string, ctxSize, budget, historyLen int, packed []chm
 	// it). Count AND sum over history messages only (packed[1:]) so the token
 	// figure matches the message count and is directly comparable to budget,
 	// which is the *history* budget (ctx.Budget already subtracts the system and
-	// tool reservations). Summing the ~3k-token system prompt into a "packed=1
+	// tool reservations). Summing the ~3k token system prompt into a "packed=1
 	// msgs" line would read as if that one history message were 3k tokens.
 	tokens, truncated := 0, 0
 	for _, msg := range packed[1:] {
@@ -138,7 +115,7 @@ func dbgWriteRequest(model string, ctxSize, budget, historyLen int, packed []chm
 		note = fmt.Sprintf(" · %d tool output(s) truncated", truncated)
 	}
 	// kept = packed minus the system message; dropped covers both budget
-	// eviction and orphan-tool drops.
+	// eviction and orphan tool drops.
 	kept := len(packed) - 1
 	dbgWritef("request",
 		"model=%s · ctx=%d (history budget=%d) · history=%d msgs → packed=%d msgs (~%d tokens) · dropped=%d oldest%s",
@@ -146,7 +123,7 @@ func dbgWriteRequest(model string, ctxSize, budget, historyLen int, packed []chm
 }
 
 // dbgWriteMessage records a chmctx.Message readably: content and tool calls
-// each get a labeled section. No-op when logging is off, so callers needn't guard.
+// each get a labeled section. No operation when logging is off, so callers needn't guard.
 func dbgWriteMessage(category string, msg chmctx.Message) {
 	if !dbgEnabled() {
 		return

@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// newChippablePrompt returns a realistically-sized promptInput. Width matters:
+// newChippablePrompt returns a realistically sized promptInput. Width matters:
 // cursor navigation walks the wrapped grid; height is irrelevant here.
 func newChippablePrompt() promptInput {
 	p := newPromptInput()
@@ -17,13 +17,13 @@ func newChippablePrompt() promptInput {
 	return p
 }
 
-// pasteKey builds the bracketed-paste KeyMsg bubbletea emits on paste.
+// pasteKey builds the bracketed paste KeyMsg bubbletea emits on paste.
 // Paste=true is the flag Update keys off of.
 func pasteKey(s string) tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s), Paste: true}
 }
 
-// makePaste returns a string with exactly n lines (n-1 newlines).
+// makePaste returns a string with exactly n lines (n 1 newlines).
 func makePaste(n int) string {
 	parts := make([]string, n)
 	for i := range parts {
@@ -33,16 +33,16 @@ func makePaste(n int) string {
 }
 
 // TestSetCursorRuneOffsetCrossesSoftWrappedLine: walking to a target row must
-// traverse a soft-wrapped logical line in between. bubbles' CursorUp inside a
-// soft-wrapped line changes only the visual position, not Line(), so a bail
+// traverse a soft wrapped logical line in between. bubbles' CursorUp inside a
+// soft wrapped line changes only the visual position, not Line(), so a bail
 // keyed on Line() alone reads that as "step did nothing" and strands the
 // cursor on the wrong logical row (the audit bug: deleting a chip above a
-// soft-wrapped line dropped the cursor into the user's instruction text).
+// soft wrapped line dropped the cursor into the user's instruction text).
 func TestSetCursorRuneOffsetCrossesSoftWrappedLine(t *testing.T) {
 	p := newPromptInput()
 	p.SetWidth(20)
 	p.SetHeight(20)
-	// Row 1 soft-wraps into several visual rows at width 20.
+	// Row 1 soft wraps into several visual rows at width 20.
 	p.SetValue("short\n" + strings.Repeat("a", 100) + "\ntail line")
 	p.ta.CursorEnd() // start at the bottom, target near the top
 
@@ -109,7 +109,7 @@ func TestBackspaceAtChipEndRemovesWholeChip(t *testing.T) {
 	}
 }
 
-// TestDeleteAtChipStartRemovesWholeChip: forward-Delete with the cursor right
+// TestDeleteAtChipStartRemovesWholeChip: forward Delete with the cursor right
 // before the label removes the whole chip.
 func TestDeleteAtChipStartRemovesWholeChip(t *testing.T) {
 	p := newChippablePrompt()
@@ -202,9 +202,9 @@ func TestTwoChipsTrackedIndependently(t *testing.T) {
 }
 
 // TestDamagedLabelAmongIdenticalChipsDropsWholeGroup: two pastes with the same
-// line count render identical labels. A word-delete at the boundary (Ctrl+W,
+// line count render identical labels. A word delete at the boundary (Ctrl+W,
 // which handleChipKey doesn't claim and snapCursorOutOfChip can't prevent)
-// damages one label; in-order re-binding would then map the surviving label to
+// damages one label; in order re binding would then map the surviving label to
 // the FIRST span's paste, silently sending the wrong content on submit. The
 // spans are indistinguishable, so reconcile drops the whole label group.
 func TestDamagedLabelAmongIdenticalChipsDropsWholeGroup(t *testing.T) {
@@ -222,7 +222,7 @@ func TestDamagedLabelAmongIdenticalChipsDropsWholeGroup(t *testing.T) {
 	if len(p.spans) != 2 {
 		t.Fatalf("precondition: expected 2 chips, got %d", len(p.spans))
 	}
-	// Word-delete backward from the first chip's end eats into its label.
+	// Word delete backward from the first chip's end eats into its label.
 	p.setCursorRuneOffset(p.spans[0].end)
 	p, _ = p.Update(tea.KeyMsg{Type: tea.KeyCtrlW})
 	if len(p.spans) != 0 {
@@ -233,8 +233,8 @@ func TestDamagedLabelAmongIdenticalChipsDropsWholeGroup(t *testing.T) {
 	}
 }
 
-// TestDamagedLabelUniqueChipDropsOnlyItself: the group-drop above must not
-// over-trigger; a damaged label with no twin drops alone and the other chip
+// TestDamagedLabelUniqueChipDropsOnlyItself: the group drop above must not
+// over trigger; a damaged label with no twin drops alone and the other chip
 // keeps its mapping.
 func TestDamagedLabelUniqueChipDropsOnlyItself(t *testing.T) {
 	p := newChippablePrompt()
@@ -335,7 +335,7 @@ func TestResetClearsChips(t *testing.T) {
 }
 
 // TestSetValueClearsChips: SetValue installs plain text and drops prior chips,
-// used by slash-popover Tab-completion, where chips can't be part of a replacement.
+// used by slash popover Tab completion, where chips can't be part of a replacement.
 func TestSetValueClearsChips(t *testing.T) {
 	p := newChippablePrompt()
 	p, _ = p.Update(pasteKey(makePaste(10)))
@@ -367,13 +367,13 @@ func TestBackspaceNotAtChipBoundaryFallsThrough(t *testing.T) {
 	}
 }
 
-// TestPageKeysMoveCursorByHeight: PgUp/PgDn move the cursor by one prompt-height.
+// TestPageKeysMoveCursorByHeight: PgUp/PgDn move the cursor by one prompt height.
 // bubbles/textarea ships an empty viewport keymap, so without our handling
-// these keys are no-ops (mouse wheel already scrolls via the MouseMsg path).
+// these keys are no operations (mouse wheel already scrolls via the MouseMsg path).
 func TestPageKeysMoveCursorByHeight(t *testing.T) {
 	p := newChippablePrompt()
 	// Fill with many rows. SetValue installs all at once, avoiding the chip
-	// threshold and per-line typing.
+	// threshold and per line typing.
 	var b strings.Builder
 	for i := 0; i < 40; i++ {
 		fmt.Fprintf(&b, "row%02d\n", i)
@@ -400,12 +400,12 @@ func TestPageKeysMoveCursorByHeight(t *testing.T) {
 	}
 }
 
-// TestCarriageReturnLineEndings: lone-\r separators (old-mac-style, some VS Code
+// TestCarriageReturnLineEndings: lone-\r separators (old mac style, some VS Code
 // TERM setups) must still yield a correct chip line count. bubbles/textarea
 // splits only on \n, so we count separators ourselves.
 func TestCarriageReturnLineEndings(t *testing.T) {
 	p := newChippablePrompt()
-	// 10-line paste, \r separators only.
+	// 10 line paste, \r separators only.
 	paste := strings.Repeat("line\r", 9) + "end"
 	p, _ = p.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(paste), Paste: true})
 
@@ -436,7 +436,7 @@ func TestCRLFLineEndings(t *testing.T) {
 }
 
 // TestPasteWithoutFlagButWithNewlineStillChips: some terminals omit the
-// bracketed-paste flag, yet multi-line content in one KeyMsg can't come from
+// bracketed paste flag, yet multi line content in one KeyMsg can't come from
 // typing (the rune collector breaks on \n), so we treat it as a paste anyway.
 func TestPasteWithoutFlagButWithNewlineStillChips(t *testing.T) {
 	p := newChippablePrompt()
@@ -451,9 +451,9 @@ func TestPasteWithoutFlagButWithNewlineStillChips(t *testing.T) {
 	}
 }
 
-// TestLongSingleLinePasteChipsByCharCount: a long single-line blob (zero
+// TestLongSingleLinePasteChipsByCharCount: a long single line blob (zero
 // newlines) still collapses: char threshold catches minified JSON and
-// one-line stack traces that line-count alone would miss.
+// one line stack traces that line count alone would miss.
 func TestLongSingleLinePasteChipsByCharCount(t *testing.T) {
 	p := newChippablePrompt()
 	big := strings.Repeat("x", 500)
@@ -467,7 +467,7 @@ func TestLongSingleLinePasteChipsByCharCount(t *testing.T) {
 	}
 }
 
-// TestBackspaceImmediatelyAfterChipRemovesIt: atomic-delete regression guard,
+// TestBackspaceImmediatelyAfterChipRemovesIt: atomic delete regression guard,
 // after a paste the cursor sits at chip.end, so one Backspace deletes the chip
 // without any manual cursor setup.
 func TestBackspaceImmediatelyAfterChipRemovesIt(t *testing.T) {
@@ -513,7 +513,7 @@ func TestPasteIntoChipInteriorKeepsBothPastes(t *testing.T) {
 
 // TestTypingIntoChipInteriorKeepsContent: typing a rune while the cursor sits
 // inside a chip label, when two chips share an identical label, must not split
-// the label and cross-map the survivor to the wrong paste. Update snaps out of
+// the label and cross map the survivor to the wrong paste. Update snaps out of
 // the chip before delegating the rune to the textarea.
 func TestTypingIntoChipInteriorKeepsContent(t *testing.T) {
 	p := newChippablePrompt()

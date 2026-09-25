@@ -47,7 +47,7 @@ func TestWriteFileEmptyPath(t *testing.T) {
 
 // TestWriteFileMkdirErrorWhenParentIsFile checks the (mkdir error) branch: a
 // MkdirAll failure must surface in the output string (bash convention), never
-// as a Go error. A file in the path triggers it; a read-only dir would not,
+// as a Go error. A file in the path triggers it; a read only dir would not,
 // since tests run as root and root bypasses directory permission bits.
 func TestWriteFileMkdirErrorWhenParentIsFile(t *testing.T) {
 	dir := t.TempDir()
@@ -64,7 +64,7 @@ func TestWriteFileMkdirErrorWhenParentIsFile(t *testing.T) {
 
 // TestWriteFileWriteErrorWhenTargetIsDir checks the (write error) branch:
 // writing to an existing directory fails at os.WriteFile, and the error must
-// come back in the output string. A directory target is root-safe, as above.
+// come back in the output string. A directory target is root safe, as above.
 func TestWriteFileWriteErrorWhenTargetIsDir(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "imadir")
@@ -101,9 +101,9 @@ func TestExecuteWriteFileWrapsResult(t *testing.T) {
 	}
 }
 
-// TestExecuteWriteFileRefusesMissingContent: valid-JSON args with no string
+// TestExecuteWriteFileRefusesMissingContent: valid JSON args with no string
 // "content" ({"path": ...} alone, or "content": null) must not decode to ""
-// and silently truncate an existing file to 0 bytes behind a success-shaped
+// and silently truncate an existing file to 0 bytes behind a success shaped
 // result. An explicit "content": "" still writes (intentional empty file).
 func TestExecuteWriteFileRefusesMissingContent(t *testing.T) {
 	dir := t.TempDir()
@@ -134,7 +134,7 @@ func TestExecuteWriteFileRefusesMissingContent(t *testing.T) {
 }
 
 // TestExecuteEditFileRefusesMissingNewString: same guard as write_file's
-// content - a dropped new_string must not decode to "" and silently delete
+// content: a dropped new_string must not decode to "" and silently delete
 // the matched text. An explicit "new_string": "" still deletes.
 func TestExecuteEditFileRefusesMissingNewString(t *testing.T) {
 	dir := t.TempDir()
@@ -177,8 +177,8 @@ func TestInlineStatusWriteFile(t *testing.T) {
 
 // TestWriteFileAppendCoercesStringFlag: a weak backend emitting `"append":
 // "true"` must still APPEND. A failed bool assertion would silently overwrite,
-// destroying the earlier parts of a chunked write behind a success-shaped
-// "wrote N bytes" - the worst possible outcome on the exact recovery path
+// destroying the earlier parts of a chunked write behind a success shaped
+// "wrote N bytes": the worst possible outcome on the exact recovery path
 // append exists for.
 func TestWriteFileAppendCoercesStringFlag(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "parts.txt")
@@ -199,10 +199,10 @@ func TestWriteFileAppendCoercesStringFlag(t *testing.T) {
 }
 
 // TestWriteFileAppendCoercesEveryTruthyShape: `append` reaches us through a
-// weak local tool-call parser, so it arrives as a bool, as the JSON number 1
+// weak local tool call parser, so it arrives as a bool, as the JSON number 1
 // (float64 after decoding), or as "True"/"true"/"1". Every one of those must
-// APPEND. Missing any shape silently OVERWRITES behind a success-shaped "wrote
-// N bytes" - destroying the earlier parts of a chunked write, or a pre-existing
+// APPEND. Missing any shape silently OVERWRITES behind a success shaped "wrote
+// N bytes": destroying the earlier parts of a chunked write, or a pre existing
 // user file, with nothing in the transcript to show for it.
 func TestWriteFileAppendCoercesEveryTruthyShape(t *testing.T) {
 	for _, truthy := range []any{true, "true", "True", "TRUE", "1", float64(1)} {

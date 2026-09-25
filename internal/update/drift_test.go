@@ -9,13 +9,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// These two tests close the silent-drift gap that the hardcoded
+// These two tests close the silent drift gap that the hardcoded
 // TestAssetNameCoversEveryReleasedPlatform table cannot: that table only
 // restates assetName's own logic, so a divergence between assetName and what
 // goreleaser actually publishes passes it. A new goreleaser build target
-// assetName doesn't recognise (Check short-circuits -> that platform silently
+// assetName doesn't recognise (Check short circuits -> that platform silently
 // never updates) or a renamed/reformatted asset (Apply 404s) is exactly the
-// regression class that locked Windows out pre-2026-05-18.
+// regression class that locked Windows out before the Windows fix.
 
 const goreleaserPath = "../../.goreleaser.yaml"
 
@@ -23,7 +23,7 @@ const goreleaserPath = "../../.goreleaser.yaml"
 type platformKey struct{ os, arch string }
 
 // goreleaserConfig is the slice of .goreleaser.yaml we assert against: the
-// goos x goarch cross-product goreleaser builds a binary for.
+// goos x goarch cross product goreleaser builds a binary for.
 type goreleaserConfig struct {
 	Builds []struct {
 		Goos   []string `yaml:"goos"`
@@ -51,7 +51,7 @@ func goreleaserMatrix(t *testing.T) map[platformKey]bool {
 		}
 	}
 	if len(m) == 0 {
-		t.Fatalf("%s yielded an empty build matrix - parsing broke", goreleaserPath)
+		t.Fatalf("%s yielded an empty build matrix: parsing broke", goreleaserPath)
 	}
 	return m
 }
@@ -88,21 +88,21 @@ func TestAssetNameMatchesGoreleaserMatrix(t *testing.T) {
 
 	for k := range matrix {
 		if _, ok := supported[k]; !ok {
-			t.Errorf("%s/%s: goreleaser builds it but assetName returns ok=false - those users would silently never auto-update; add a case to assetName", k.os, k.arch)
+			t.Errorf("%s/%s: goreleaser builds it but assetName returns ok=false: those users would silently never auto-update; add a case to assetName", k.os, k.arch)
 		}
 	}
 	for k := range supported {
 		if !matrix[k] {
-			t.Errorf("%s/%s: assetName resolves it but goreleaser doesn't build it - Apply would 404; remove it from assetName or add it to .goreleaser.yaml", k.os, k.arch)
+			t.Errorf("%s/%s: assetName resolves it but goreleaser doesn't build it: Apply would 404; remove it from assetName or add it to .goreleaser.yaml", k.os, k.arch)
 		}
 	}
 }
 
-// TestPublishedManifestMatchesAssetName is opt-in: point CODEHAMR_CHECK_MANIFEST
+// TestPublishedManifestMatchesAssetName is opt in: point CODEHAMR_CHECK_MANIFEST
 // at a goreleaser checksums file (CI sets it to dist/codehamr_checksums.txt after
 // a release build) and it asserts the published asset names are EXACTLY the set
 // assetName produces. This is the only check that exercises real goreleaser
-// output, so it catches a name_template edit, an archive-format switch
+// output, so it catches a name_template edit, an archive format switch
 // (binary -> zip/tar.gz), or the implicit windows ".exe" append changing, none
 // of which the hermetic test above can see. Skips when the env var is unset, so
 // the default `go test ./...` never needs goreleaser or the network.
@@ -139,12 +139,12 @@ func TestPublishedManifestMatchesAssetName(t *testing.T) {
 	}
 	for name := range want {
 		if !published[name] {
-			t.Errorf("assetName produces %q but it is NOT in the published manifest - that platform's auto-update would 404 / find no checksum row", name)
+			t.Errorf("assetName produces %q but it is NOT in the published manifest: that platform's auto-update would 404 / find no checksum row", name)
 		}
 	}
 	for name := range published {
 		if !want[name] {
-			t.Errorf("published manifest lists %q which assetName never produces - a stale/renamed asset auto-update can't reach", name)
+			t.Errorf("published manifest lists %q which assetName never produces: a stale/renamed asset auto-update can't reach", name)
 		}
 	}
 }

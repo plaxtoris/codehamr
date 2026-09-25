@@ -1,19 +1,7 @@
-// Package update performs a passive freshness check against the latest GitHub
-// release: it sha256-hashes the running executable and compares it to the row
-// for the current os/arch in goreleaser's published codehamr_checksums.txt.
-// Mismatch = the local binary is stale.
-//
-// Called once before the TUI starts (see maybeSelfUpdate): Check decides
-// whether an update exists, Apply atomically replaces the running binary, and
-// the caller's reExec (unix execve / Windows spawn-and-wait) re-enters the new
-// version. The TUI carries no update awareness.
-//
-// Any failure, whether a network hiccup, offline, missing asset, or parse
-// glitch, returns "no update" rather than an error: a startup banner that
-// shouts on flaky internet is worse than one that stays quiet.
-// CODEHAMR_NO_UPDATE_CHECK=1 is the escape hatch for air-gapped setups, CI,
-// and the post-update re-exec (which
-// sets it so the child doesn't loop into a second check).
+// Package update compares the running binary with GitHub release checksums
+// and installs verified replacement binaries. Check returns false on failure;
+// Apply returns errors to the caller. CODEHAMR_NO_UPDATE_CHECK=1 skips Check.
+// The caller handles relaunching and skips checks for local development builds.
 package update
 
 import (
@@ -31,10 +19,8 @@ import (
 	"time"
 )
 
-// checksumsURL is the "latest" redirect for the goreleaser checksums asset.
-// Direct CDN download, no GitHub API call, so no rate limit even for users
-// who start many sessions. var not const so tests can point it at an httptest
-// server; production never reassigns it.
+// checksumsURL points to the release checksum asset without using the GitHub
+// API. Tests replace it with a local server.
 var checksumsURL = "https://github.com/codehamr/codehamr/releases/latest/download/codehamr_checksums.txt"
 
 // releaseBase is the "latest" redirect for individual binary assets; combined
@@ -46,7 +32,7 @@ var releaseBase = "https://github.com/codehamr/codehamr/releases/latest/download
 const fetchTimeout = 2 * time.Second
 
 // promoteRename indirects Apply's final rename of the verified download onto
-// execPath. var not const purely so tests can drive the restore-on-failure
+// execPath. var not const purely so tests can drive the restore on failure
 // branch (which can leave the user with no executable) deterministically.
 var promoteRename = os.Rename
 
@@ -74,16 +60,16 @@ func Check(ctx context.Context, execPath string) bool {
 
 // assetName mirrors the name_template in .goreleaser.yaml. Every goos goreleaser
 // builds for must have a case here; a missing one silently locks that
-// platform's users out of auto-updates (the Windows regression);
+// platform's users out of auto updates (the Windows regression);
 // TestAssetNameCoversEveryReleasedPlatform pins the contract.
 //
 // Unsupported platforms (freebsd, plan9, linux/386, …) return ok=false so Check
-// short-circuits before touching the network.
+// short circuits before touching the network.
 func assetName(goos, goarch string) (string, bool) {
 	ext := ""
 	switch goos {
 	case "linux":
-		// keep as-is
+		// keep as is
 	case "darwin":
 		goos = "macos"
 	case "windows":
@@ -115,18 +101,18 @@ func hashFile(path string) (string, error) {
 
 // Apply downloads the current platform's binary, verifies its sha256 against the
 // published codehamr_checksums.txt, and atomically replaces execPath. The caller
-// is expected to reExec afterwards (unix execve / Windows spawn-and-wait) so the
-// session continues on the new binary with no user-visible restart.
+// is expected to reExec afterwards (unix execve / Windows spawn and wait) so the
+// session continues on the new binary with no user visible restart.
 //
-// Checksum verification closes the supply-chain hole an unchecked download
-// leaves open: a corrupted CDN response, a TLS-MITM proxy, or a swapped binary
+// Checksum verification closes the supply chain hole an unchecked download
+// leaves open: a corrupted CDN response, a TLS MITM proxy, or a swapped binary
 // would otherwise install whatever bytes arrived. Any mismatch errors before the
 // binary is promoted.
 //
 // The temp file lives in execPath's directory so os.Rename stays an atomic
-// intra-filesystem move. A read-only dir (e.g. /usr/local/bin without sudo)
+// intra filesystem move. A read only dir (e.g. /usr/local/bin without sudo)
 // surfaces os.CreateTemp's EACCES verbatim, so the caller can hint about sudo or
-// a user-local PREFIX.
+// a user local PREFIX.
 //
 // ctx governs both fetches; the binary download sets no http.Client.Timeout, so
 // ctx's deadline is the only budget.
@@ -165,13 +151,13 @@ func Apply(ctx context.Context, execPath string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download: status %d", resp.StatusCode)
 	}
-	// Stream-hash while writing so verification needs no second read of the
+	// Stream hash while writing so verification needs no second read of the
 	// temp file.
 	h := sha256.New()
 	if _, err := io.Copy(io.MultiWriter(tmp, h), resp.Body); err != nil {
 		return err
 	}
-	// Sync before the rename: rename is metadata-only, so without the flush a
+	// Sync before the rename: rename is metadata only, so without the flush a
 	// power loss right after Apply can journal the rename while the data never
 	// hit disk, leaving a truncated binary at execPath that CleanupOld can
 	// never reach (recoverable only by hand from .old).
@@ -188,11 +174,11 @@ func Apply(ctx context.Context, execPath string) error {
 	if err := os.Chmod(tmpPath, 0o755); err != nil {
 		return err
 	}
-	// Rename-aside, not overwrite-in-place: Windows blocks replacing a running
+	// Rename aside, not overwrite in place: Windows blocks replacing a running
 	// .exe but allows renaming one. Move the current binary to execPath+".old",
 	// then move the download into the vacant execPath. Unix needs no dance (the
 	// kernel keeps the running inode alive across an overwriting rename) but
-	// runs the same path for one cross-platform codepath. CleanupOld removes the
+	// runs the same path for one cross platform codepath. CleanupOld removes the
 	// .old at next launch, once the prior process has released its handle.
 	oldPath := execPath + ".old"
 	// A stale .old from a failed cleanup makes the next Rename fail on Windows
@@ -216,22 +202,22 @@ func Apply(ctx context.Context, execPath string) error {
 
 // CleanupOld removes the execPath+".old" left by a previous Apply. Run at the
 // start of the next launch: on Windows the .old is locked for the prior
-// process's lifetime, so unlink-at-Apply-time fails but unlink-at-next-launch
+// process's lifetime, so unlink at Apply time fails but unlink at next launch
 // wins. Failure is silent: a leftover .old wastes disk but never breaks the
 // session.
 //
-// It also sweeps orphaned .codehamr-update-* temp files: a Ctrl+C mid-download
+// It also sweeps orphaned .codehamr-update-* temp files: a Ctrl+C mid download
 // (no signal handler exists that early, so the default disposition kills the
 // process outright) skips Apply's deferred Remove, and each retry uses a fresh
 // random suffix, so without the sweep every interrupted update strands another
-// multi-MB partial in the install dir forever. Only files older than
+// multi MB partial in the install dir forever. Only files older than
 // orphanSweepAge are removed: a second instance launched during a pending
-// update would otherwise unlink the first instance's in-flight download and
+// update would otherwise unlink the first instance's in flight download and
 // fail that update spuriously; a genuinely orphaned partial just waits one
 // more launch.
 func CleanupOld(execPath string) {
 	_ = os.Remove(execPath + ".old")
-	// Interrupted downloads, plus the tool-output spill files tools.Execute
+	// Interrupted downloads, plus the tool output spill files tools.Execute
 	// writes when a result outgrows the context budget. A long unattended run
 	// can strand hundreds of megabytes of those, and a devcontainer's /tmp has
 	// no reaper of its own.
@@ -259,7 +245,7 @@ func sweepOrphans(pattern string) {
 const orphanSweepAge = time.Hour
 
 // fetchHash downloads codehamr_checksums.txt and returns the hash for asset.
-// The manifest is one line per asset, "<hex-sha256>  <filename>"; we match the
+// The manifest is one line per asset, "<hex sha256>  <filename>"; we match the
 // last field so a future prefix tweak still works.
 //
 // A scanner read error is surfaced, not dropped as "", nil: Apply treats "no
@@ -276,7 +262,7 @@ func fetchHash(ctx context.Context, asset string) (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("non-200: %d", resp.StatusCode)
+		return "", fmt.Errorf("HTTP status %d", resp.StatusCode)
 	}
 	sc := bufio.NewScanner(resp.Body)
 	for sc.Scan() {

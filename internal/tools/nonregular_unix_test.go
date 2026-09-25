@@ -32,7 +32,7 @@ func mkfifo(t *testing.T) string {
 // open(2) waiting for a writer, leaking the tool goroutine past Ctrl+C (which
 // cancels the turn but cannot unblock the read); an endless device file would
 // grow the buffer without bound. The Stat guard must refuse without opening.
-// If the guard is missing, this test hangs rather than fails - the timeout is
+// If the guard is missing, this test hangs rather than fails: the timeout is
 // the assertion.
 func TestReadFileRefusesNonRegular(t *testing.T) {
 	path := mkfifo(t)

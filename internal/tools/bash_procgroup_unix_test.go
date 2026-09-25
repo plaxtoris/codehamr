@@ -13,9 +13,9 @@ import (
 	"time"
 )
 
-// TestBashKillsBackgroundedChildOnCancel proves bash's process-group kill
+// TestBashKillsBackgroundedChildOnCancel proves bash's process group kill
 // reaches backgrounded grandchildren. A naked `cmd &` outlives /bin/sh; without
-// setProcessGroup's Setpgid + negative-PID SIGKILL on cancel, it leaks and runs
+// setProcessGroup's Setpgid + negative PID SIGKILL on cancel, it leaks and runs
 // to completion after Ctrl+C. Polls a deadline rather than sleeping the full
 // 30s, so it stays fast and deterministic.
 func TestBashKillsBackgroundedChildOnCancel(t *testing.T) {
@@ -47,7 +47,7 @@ func TestBashKillsBackgroundedChildOnCancel(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(10 * time.Second):
-		t.Fatal("Bash did not return within 10s after cancel - group kill failed")
+		t.Fatal("Bash did not return within 10s after cancel: group kill failed")
 	}
 
 	// Poll until the child is gone; the kernel may take a beat to tear the
@@ -59,7 +59,7 @@ func TestBashKillsBackgroundedChildOnCancel(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatalf("backgrounded child %d survived parent cancel - process group was not killed", pid)
+	t.Fatalf("backgrounded child %d survived parent cancel: process group was not killed", pid)
 }
 
 // waitForPID blocks until pidFile contains a parseable PID, then returns it.

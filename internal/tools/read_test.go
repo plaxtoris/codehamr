@@ -38,10 +38,10 @@ func TestReadFileMissingFile(t *testing.T) {
 }
 
 // TestReadFileWindowsOversizeContent: a file past one window comes back as a
-// contiguous HEAD plus the exact offset to continue from - never Truncate's
+// contiguous HEAD plus the exact offset to continue from: never Truncate's
 // head+tail with the middle dropped, which is the unrecoverable dead end
 // offset/limit exists to remove. The result must also stay under
-// ToolOutputCap*4 so Execute's Truncate can't re-fire on the window.
+// ToolOutputCap*4 so Execute's Truncate can't re fire on the window.
 func TestReadFileWindowsOversizeContent(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "big.txt")
@@ -110,8 +110,8 @@ func TestReadFileOffsetPastEnd(t *testing.T) {
 	}
 }
 
-// TestReadFileCoercesStringOffset: weak local tool-call parsers emit integers
-// as strings. A string offset silently read as 0 would re-read the head
+// TestReadFileCoercesStringOffset: weak local tool call parsers emit integers
+// as strings. A string offset silently read as 0 would reread the head
 // forever, exactly the loop the continuation note invites.
 func TestReadFileCoercesStringOffset(t *testing.T) {
 	dir := t.TempDir()
@@ -187,7 +187,7 @@ func TestInlineStatusReadFile(t *testing.T) {
 
 // TestReadFileCoercesFloatShapedOffset: a model echoing back the continuation
 // note can type the offset as "411.0". Dropped to 0, read_file returns the
-// byte-identical head window with the byte-identical note, forever - and every
+// byte identical head window with the byte identical note, forever: and every
 // one of those is a SUCCESS, so no failure streak can ever form to break it.
 func TestReadFileCoercesFloatShapedOffset(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "f.txt")
@@ -206,9 +206,9 @@ func TestReadFileCoercesFloatShapedOffset(t *testing.T) {
 }
 
 // TestReadFileOverLongLineStillPages: a file whose FIRST line is a minified
-// bundle still has ordinary lines after it. Printing only the byte-cut note and
+// bundle still has ordinary lines after it. Printing only the byte cut note and
 // swallowing the continuation offset strands the rest of the file behind a dead
-// end - the exact failure offset/limit exists to remove.
+// end: the exact failure offset/limit exists to remove.
 func TestReadFileOverLongLineStillPages(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "bundle.js")
 	body := strings.Repeat("x", 30000) + "\n" + strings.Repeat("ordinary line\n", 500)
@@ -245,7 +245,7 @@ func TestReadFileKeepsExactBytesAcrossAnOverLongCut(t *testing.T) {
 	}
 }
 
-// TestReadFileTooLargeRefused: read_file slurps whole files, so a multi-GB
+// TestReadFileTooLargeRefused: read_file slurps whole files, so a multi GB
 // log would OOM the process; the Stat gate refuses it with a recovery string.
 // Sparse file: Truncate allocates no blocks, so the test costs no real disk.
 func TestReadFileTooLargeRefused(t *testing.T) {

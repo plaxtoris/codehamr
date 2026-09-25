@@ -15,7 +15,7 @@ var (
 	styleDim    = lipgloss.NewStyle().Faint(true)
 	styleStatus = lipgloss.NewStyle().Faint(true)
 
-	// Warn/error break the single-accent rule on purpose: terminal-convention
+	// Warn/error break the single accent rule on purpose: terminal convention
 	// yellow and red, which fighting costs more than it gains.
 	styleWarn  = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 	styleError = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
@@ -32,7 +32,7 @@ var (
 	styleUser = lipgloss.NewStyle().Bold(true)
 
 	// Backend label: connected is quiet (bold, no colour); disconnected shouts
-	// with yellow + `!` so the state survives colour-stripped terminals.
+	// with yellow + `!` so the state survives colour stripped terminals.
 	styleBackendOK   = lipgloss.NewStyle().Bold(true)
 	styleBackendWarn = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("11"))
 
@@ -42,8 +42,8 @@ var (
 	stylePopoverCurrent  = lipgloss.NewStyle().Bold(true)
 	stylePopoverSelected = lipgloss.NewStyle().Bold(true).Foreground(hamrColor)
 
-	// Queued-prompt panel: a faint rounded box above the prompt holding a prompt
-	// the user lined up mid-turn. Structural framing, not a highlight, so it
-	// stays faint rather than taking the accent. Width is set per-render.
+	// Queued prompt panel: a faint rounded box above the prompt holding a prompt
+	// the user lined up mid turn. Structural framing, not a highlight, so it
+	// stays faint rather than taking the accent. Width is set per render.
 	styleQueued = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1).Faint(true)
 )

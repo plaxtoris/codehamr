@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # codehamr installer: fetch the latest release binary and install it into a
-# user-writable prefix so sudo is never needed for the default flow.
+# user writable prefix so sudo is never needed for the default flow.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/codehamr/codehamr/main/install.sh | bash
@@ -28,7 +28,7 @@ esac
 
 # Pick install dir. Explicit PREFIX wins. Otherwise prefer a directory that
 # is ALREADY on PATH and writable, so `codehamr` works in the current shell
-# without re-sourcing anything. Only when no such dir exists do we fall back
+# without re sourcing anything. Only when no such dir exists do we fall back
 # to ~/.local/bin and plumb PATH via the user's shell rc files.
 on_path() { case ":${PATH}:" in *":$1:"*) return 0 ;; *) return 1 ;; esac; }
 writable_or_creatable() {
@@ -67,7 +67,7 @@ echo "✓ installed → ${bindir}/codehamr"
 # If bindir isn't on PATH, append an export to existing shell rc files so
 # future shells pick it up, idempotent via a fixed marker line. The current
 # shell can't be mutated from this child process, so we additionally print
-# one paste-ready line that activates the install without a terminal restart.
+# one paste ready line that activates the install without a terminal restart.
 if ! on_path "$bindir"; then
   line="export PATH=\"${bindir}:\$PATH\""
   marker="# codehamr-path"

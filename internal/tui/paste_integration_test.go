@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// TestModelBracketedPasteCreatesChip checks a bracketed-paste KeyMsg through
+// TestModelBracketedPasteCreatesChip checks a bracketed paste KeyMsg through
 // Model.Update reaches promptInput.Update and yields a chip, guarding against
 // an earlier handleKey branch swallowing the paste.
 func TestModelBracketedPasteCreatesChip(t *testing.T) {

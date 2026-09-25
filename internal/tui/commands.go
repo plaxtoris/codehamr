@@ -6,7 +6,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/codehamr/codehamr/internal/cloud"
 	chmctx "github.com/codehamr/codehamr/internal/ctx"
 	"github.com/codehamr/codehamr/internal/llm"
 	"github.com/codehamr/codehamr/internal/tools"
@@ -35,8 +34,8 @@ type toolResultMsg struct {
 	turnCtx context.Context
 }
 
-// readEvent drains one event from the LLM stream as a tea.Msg, re-scheduled
-// until the channel closes. Tags ch so Update can spot stale prior-turn events.
+// readEvent drains one event from the LLM stream as a tea.Msg, re scheduled
+// until the channel closes. Tags ch so Update can spot stale prior turn events.
 func readEvent(ch <-chan llm.Event) tea.Cmd {
 	return func() tea.Msg {
 		e, ok := <-ch
@@ -48,28 +47,26 @@ func readEvent(ch <-chan llm.Event) tea.Cmd {
 }
 
 // runToolCall executes one tool call off the UI goroutine. parent is the
-// per-turn root: Ctrl+C aborts the tool mid-run, and the toolResultMsg carries
+// per turn root: Ctrl+C aborts the tool mid run, and the toolResultMsg carries
 // that ctx so Update can drop it if the turn has moved on.
 //
-// No outer timeout: bash owns its model-set per-call timeout (capped at 3600s
-// by the schema), write_file/edit_file are filesystem-fast. An outer cap would
-// silently override the model's bash timeout: a 30-min build dying at 3 min.
+// No outer timeout: bash owns its model set per call timeout (capped at 3600s
+// by the schema), write_file/edit_file are filesystem fast. An outer cap would
+// silently override the model's bash timeout: a 30 min build dying at 3 min.
 func runToolCall(parent context.Context, call chmctx.ToolCall) tea.Cmd {
 	return func() tea.Msg {
 		return toolResultMsg{Msg: tools.Execute(parent, call), turnCtx: parent}
 	}
 }
 
-// errorMessage maps a stream error into a one-line TUI hint, same format across
+// errorMessage maps a stream error into a one line TUI hint, same format across
 // all profiles.
 func (m Model) errorMessage(e llm.Event) string {
 	if e.Err == nil {
 		return ""
 	}
 	switch {
-	case errors.Is(e.Err, cloud.ErrBudgetExhausted):
-		return "⚠ hamrpass depleted · top up at codehamr.com"
-	case errors.Is(e.Err, cloud.ErrUnauthorized):
+	case errors.Is(e.Err, llm.ErrUnauthorized):
 		return "⚠ key rejected · check models." + m.cfg.Active + ".key in .codehamr/config.yaml"
 	case isUnreachable(e.Err):
 		return "⚠ unreachable: " + m.cfg.ActiveURL() + " · /models to switch profile"
@@ -79,6 +76,6 @@ func (m Model) errorMessage(e llm.Event) string {
 }
 
 func isUnreachable(err error) bool {
-	_, ok := errors.AsType[cloud.ErrUnreachable](err)
+	_, ok := errors.AsType[llm.ErrUnreachable](err)
 	return ok
 }

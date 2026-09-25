@@ -9,7 +9,7 @@ import (
 )
 
 // typeChars feeds each rune of s as a separate KeyMsg, rendering View()
-// after each. Non-cosmetic: the viewport only populates its `lines` slice
+// after each. Non cosmetic: the viewport only populates its `lines` slice
 // (and thus its YOffset clamp) inside View(), so batching keys without it
 // keeps maxYOffset at 0 and never reproduces real scroll bugs. Mirrors
 // real bubbletea, which renders after every Update.
@@ -36,16 +36,16 @@ func TestTypingPreservesEarlyContent(t *testing.T) {
 	mm := final.(Model)
 	view := mm.ta.View()
 	if !strings.Contains(view, "ZZZSTART") {
-		t.Fatalf("first chars typed are not visible - viewport scrolled past them.\n"+
+		t.Fatalf("first chars typed are not visible: viewport scrolled past them.\n"+
 			"ta height=%d visualLines=%d width=%d\nView:\n%s",
 			mm.ta.Height(), mm.visualPromptLines(), mm.width, view)
 	}
 }
 
 // TestTypingOverflowKeepsCursorVisible: once content overflows
-// maxTextareaHeight, pre-grow must NOT pin the viewport to the top: that
+// maxTextareaHeight, pre grow must NOT pin the viewport to the top: that
 // would scroll the cursor off the bottom and the user types blind. The
-// natural bottom-anchored scroll is correct, so the LAST char must show.
+// natural bottom anchored scroll is correct, so the LAST char must show.
 func TestTypingOverflowKeepsCursorVisible(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	// Force a small cap: height=10, minViewport=5, chrome=2 → maxTA=3.
@@ -61,7 +61,7 @@ func TestTypingOverflowKeepsCursorVisible(t *testing.T) {
 	}
 	view := mm.ta.View()
 	if !strings.Contains(view, "ROW4END") {
-		t.Fatalf("end of overflowing content not visible - cursor scrolled off.\n"+
+		t.Fatalf("end of overflowing content not visible: cursor scrolled off.\n"+
 			"maxTA=%d ta height=%d visualLines=%d width=%d\nView:\n%s",
 			mm.maxTextareaHeight(), mm.ta.Height(), mm.visualPromptLines(), mm.width, view)
 	}

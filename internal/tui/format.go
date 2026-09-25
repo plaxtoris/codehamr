@@ -24,8 +24,8 @@ func humanTokens(n int) string {
 	}
 }
 
-// liveElapsed renders a running wall-clock duration for the status bar: whole
-// seconds under a minute (no sub-second decimal spinning at the spinner's
+// liveElapsed renders a running wall clock duration for the status bar: whole
+// seconds under a minute (no sub second decimal spinning at the spinner's
 // refresh rate), then `6m 51s` / `1h 14m`. The lower unit is always two digits
 // and round values are NOT collapsed (`8m 00s`, not `8m`), so the readout never
 // jumps from `7m 59s` straight to `8m` and back: it counts up visually steady.
@@ -43,7 +43,7 @@ func liveElapsed(d time.Duration) string {
 
 // humanRate renders throughput: `25 tok/s`, `5.3 tok/s`. Returns "" on
 // degenerate input (no tokens or zero elapsed) so the caller omits the
-// segment. Sub-10 tok/s keeps one decimal: reasoning models sit at 1.x
+// segment. Sub 10 tok/s keeps one decimal: reasoning models sit at 1.x
 // where that decimal is the only signal; above 10 it's noise.
 func humanRate(tokens int, d time.Duration) string {
 	if tokens <= 0 || d <= 0 {
@@ -58,7 +58,7 @@ func humanRate(tokens int, d time.Duration) string {
 
 // backendLabel renders the connection signal. Connected: profile name, bold,
 // no colour. Disconnected: bold yellow plus a `!` marker, so the state stays
-// legible on colour-stripped terminals.
+// legible on colour stripped terminals.
 func backendLabel(c *config.Config, connected bool) string {
 	if connected {
 		return styleBackendOK.Render(c.Active)
@@ -66,7 +66,7 @@ func backendLabel(c *config.Config, connected bool) string {
 	return styleBackendWarn.Render(c.Active + " !")
 }
 
-// humanInt formats a non-negative integer with commas so a context window
+// humanInt formats a nonnegative integer with commas so a context window
 // like 262144 reads as "262,144" rather than a wall of digits.
 func humanInt(n int) string {
 	s := strconv.Itoa(n)

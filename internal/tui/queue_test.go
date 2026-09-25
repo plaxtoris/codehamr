@@ -43,7 +43,7 @@ func TestQueueStoresPromptMidTurn(t *testing.T) {
 	}
 }
 
-// TestQueueEmptyMidTurnIsNoOp: Enter on a blank prompt mid-turn stays silent, so
+// TestQueueEmptyMidTurnIsNoOp: Enter on a blank prompt mid turn stays silent, so
 // a reflexive Enter while watching the agent doesn't queue an empty slot.
 func TestQueueEmptyMidTurnIsNoOp(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -57,8 +57,8 @@ func TestQueueEmptyMidTurnIsNoOp(t *testing.T) {
 	}
 }
 
-// TestQueueSecondEnterAppends: a second mid-turn Enter appends (newline-joined)
-// to the existing slot, so a multi-part instruction builds up in one queued
+// TestQueueSecondEnterAppends: a second mid turn Enter appends (newline joined)
+// to the existing slot, so a multi part instruction builds up in one queued
 // prompt that fires as a single turn.
 func TestQueueSecondEnterAppends(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -78,11 +78,11 @@ func TestQueueSecondEnterAppends(t *testing.T) {
 	}
 }
 
-// TestQueueRefusesSlashMix: a slash command never newline-joins with a queued
-// prompt, in either order. Joined slash-first, the whole slot would fire as ONE
-// slash command whose Fields-split swallows the prose as bogus args (a queued
-// /clear plus a follow-up instruction wipes the conversation AND silently drops
-// the instruction); joined prose-first, the slash line ships to the LLM as
+// TestQueueRefusesSlashMix: a slash command never newline joins with a queued
+// prompt, in either order. Joined slash first, the whole slot would fire as ONE
+// slash command whose Fields split swallows the prose as bogus args (a queued
+// /clear plus a follow up instruction wipes the conversation AND silently drops
+// the instruction); joined prose first, the slash line ships to the LLM as
 // prose. The refused draft must stay in the textarea, nothing lost.
 func TestQueueRefusesSlashMix(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -121,9 +121,9 @@ func TestQueueRefusesSlashMix(t *testing.T) {
 	}
 }
 
-// TestQueueAutoSubmitsAfterTurn drives a full turn with a prompt queued mid-flight
-// and asserts the queued prompt auto-fires a second request when the turn ends,
-// then the slot is cleared. round==2 is the proof the follow-up actually ran.
+// TestQueueAutoSubmitsAfterTurn drives a full turn with a prompt queued mid flight
+// and asserts the queued prompt auto fires a second request when the turn ends,
+// then the slot is cleared. round==2 is the proof the follow up actually ran.
 func TestQueueAutoSubmitsAfterTurn(t *testing.T) {
 	var round int
 	var bodies []string
@@ -137,7 +137,7 @@ func TestQueueAutoSubmitsAfterTurn(t *testing.T) {
 	}
 	m := newTestModel(t, handler)
 	mm, cmd := m.submit("first", "first", promptEntry{display: "first"})
-	// Queue a follow-up while the first turn is in flight (before draining it).
+	// Queue a follow up while the first turn is in flight (before draining it).
 	m2 := mm.(Model)
 	m2.queued = &queuedPrompt{send: "second please", echo: "second please"}
 
@@ -161,7 +161,7 @@ func TestQueueAutoSubmitsAfterTurn(t *testing.T) {
 // TestQueueRestoredOnCtrlC: a Ctrl+C abort never fires the queued prompt (the
 // user took back control); it returns the text to the textarea as an editable
 // draft and clears the slot, so there's no idle "queued" box that would
-// orphan-fire after the next turn.
+// orphan fire after the next turn.
 func TestQueueRestoredOnCtrlC(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -186,7 +186,7 @@ func TestQueueRestoredOnCtrlC(t *testing.T) {
 
 // TestQueueRestoreKeepsExistingDraft: if the user was typing a new prompt when
 // they Ctrl+C, that draft wins; the queued prompt is dropped rather than
-// clobbering the in-progress text.
+// clobbering the in progress text.
 func TestQueueRestoreKeepsExistingDraft(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -208,7 +208,7 @@ func TestQueueRestoreKeepsExistingDraft(t *testing.T) {
 }
 
 // TestQueueWaitsForVerifyNudge: a substantial clean finish triggers the verify
-// re-grounding nudge, which continues the turn. The queued prompt must NOT fire
+// re grounding nudge, which continues the turn. The queued prompt must NOT fire
 // then (the turn isn't ending); it stays queued until the turn truly ends.
 func TestQueueWaitsForVerifyNudge(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -216,7 +216,7 @@ func TestQueueWaitsForVerifyNudge(t *testing.T) {
 	m.phase = phaseStreaming
 	m.toolRounds = verifyNudgeMinRounds // substantial → verify nudge fires
 	m.llmRounds = verifyNudgeMinRounds
-	m.turnActed = true // the turn wrote something; a read-only turn is exempt
+	m.turnActed = true // the turn wrote something; a read only turn is exempt
 	m.stream = make(chan llm.Event)
 	m.history = []chmctx.Message{
 		{Role: chmctx.RoleUser, Content: "build it"},
@@ -228,14 +228,14 @@ func TestQueueWaitsForVerifyNudge(t *testing.T) {
 	om := out.(Model)
 
 	if cmd == nil || !om.verifyNudged {
-		t.Fatal("a substantial clean finish must re-prompt via the verify nudge")
+		t.Fatal("a substantial clean finish must reprompt via the verify nudge")
 	}
 	if om.queued == nil || om.queued.send != "now deploy" {
-		t.Fatalf("the queued prompt must wait through the verify re-prompt, got %+v", om.queued)
+		t.Fatalf("the queued prompt must wait through the verify reprompt, got %+v", om.queued)
 	}
 	last := om.history[len(om.history)-1]
 	if last.Role != chmctx.RoleSystem {
-		t.Fatalf("the re-prompt must append the verify note, not the queued user msg, got %+v", last)
+		t.Fatalf("the reprompt must append the verify note, not the queued user msg, got %+v", last)
 	}
 }
 
@@ -271,14 +271,14 @@ func TestUnqueueOnlyWhenTextareaEmpty(t *testing.T) {
 	om := out.(Model)
 
 	if om.queued == nil || om.queued.send != "queued one" {
-		t.Fatalf("Backspace on a non-empty prompt must not unqueue, got %+v", om.queued)
+		t.Fatalf("Backspace on a nonempty prompt must not unqueue, got %+v", om.queued)
 	}
 	if om.ta.Value() != "draf" {
-		t.Fatalf("Backspace on a non-empty prompt must delete a char, got %q", om.ta.Value())
+		t.Fatalf("Backspace on a nonempty prompt must delete a char, got %q", om.ta.Value())
 	}
 }
 
-// TestClearWipesQueue: /clear resets the conversation, so a queued follow-up must
+// TestClearWipesQueue: /clear resets the conversation, so a queued follow up must
 // go with it (it would target a conversation that no longer exists).
 func TestClearWipesQueue(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -290,7 +290,7 @@ func TestClearWipesQueue(t *testing.T) {
 }
 
 // TestQueuedPromptRendersInView: while something is queued the prompt area shows a
-// labeled box with the echo text, so the user can see what will auto-submit;
+// labeled box with the echo text, so the user can see what will auto submit;
 // nothing renders when the slot is empty.
 func TestQueuedPromptRendersInView(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -311,7 +311,7 @@ func TestQueuedPromptRendersInView(t *testing.T) {
 	}
 }
 
-// TestQueueExpandsChipsOnFire: a chip-bearing paste queued mid-turn keeps its
+// TestQueueExpandsChipsOnFire: a chip bearing paste queued mid turn keeps its
 // expanded content for the LLM (send) while the box echo stays collapsed, the
 // same Value()/DisplayValue() split submit uses for a typed prompt.
 func TestQueueExpandsChipsOnFire(t *testing.T) {
@@ -345,7 +345,7 @@ func TestQueueAutoFireUnitFromStreamClosed(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.installTurnContext()
 	m.phase = phaseStreaming
-	m.stream = make(chan llm.Event) // non-nil so handleStreamClosed proceeds
+	m.stream = make(chan llm.Event) // nonnil so handleStreamClosed proceeds
 	m.history = []chmctx.Message{
 		{Role: chmctx.RoleUser, Content: "first"},
 		{Role: chmctx.RoleAssistant, Content: "done"},

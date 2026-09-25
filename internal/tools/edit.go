@@ -6,12 +6,10 @@ import (
 	"strings"
 )
 
-// EditFile replaces old_string with new_string in path. old_string must match
-// EXACTLY ONCE; otherwise the file is untouched and an error string is returned
-// so the model sees the failure and reacts, same convention as bash/WriteFile.
-//
-// Empty old_string is rejected (no anchor, every position matches);
-// old_string == new_string is rejected as a no-op turn-waster.
+// EditFile replaces one unambiguous occurrence of old_string with new_string.
+// It tries an exact match, then a match of whole lines ignoring whitespace.
+// An empty search string or an unchanged replacement is rejected. Failures
+// are returned as result text for the model.
 func EditFile(path, oldString, newString string) string {
 	if path == "" {
 		return "(empty path)"
@@ -22,16 +20,14 @@ func EditFile(path, oldString, newString string) string {
 	if oldString == newString {
 		return "(no change: old_string equals new_string)"
 	}
-	// Same guard as ReadFile: open(2) on a FIFO blocks forever and Ctrl+C
-	// can't unblock it, leaking the tool goroutine. Stat never blocks. The same
-	// Stat also size-gates the whole-file read below: os.ReadFile on a multi-GB
-	// log would OOM-kill the TUI, the hazard bash's capture cap already stops.
+	// Reject special files and oversized input before reading. This avoids
+	// blocking on a FIFO or allocating memory for an unbounded log file.
 	if info, err := os.Stat(path); err == nil {
 		if !info.Mode().IsRegular() && !info.IsDir() {
 			return fmt.Sprintf("(read error: %s is not a regular file)", path)
 		}
 		if info.Mode().IsRegular() && info.Size() > maxFileBytes {
-			return fmt.Sprintf("(too large: %s is %d bytes, over edit_file's %dMB cap - edit a file this size with bash instead: sed -i or a python one-liner)", path, info.Size(), maxFileBytes>>20)
+			return fmt.Sprintf("(too large: %s is %d bytes, over edit_file's %dMB cap: edit a file this size with bash instead: sed -i or a short Python script)", path, info.Size(), maxFileBytes>>20)
 		}
 	}
 	raw, err := os.ReadFile(path)
@@ -41,31 +37,29 @@ func EditFile(path, oldString, newString string) string {
 	content := string(raw)
 	n := strings.Count(content, oldString)
 	if n == 0 {
-		// A near-miss that differs only in whitespace (wrong indentation, tabs vs
+		// A near miss that differs only in whitespace (wrong indentation, tabs vs
 		// spaces) is the most common edit_file failure for an LLM; each one costs
-		// a re-read round plus a failure-streak entry. When the near-miss is a
+		// a reread round plus a failure streak entry. When the near miss is a
 		// run of WHOLE lines matching exactly once, apply it: the uniqueness gate
-		// preserves the exactly-once guarantee, and the spliced bytes are the
+		// preserves the exactly once guarantee, and the spliced bytes are the
 		// model's own new_string, exactly what an exact match would have written.
-		// Anything looser (mid-line fragments, 0 or 2+ fuzzy matches) still fails
+		// Anything looser (mid line fragments, 0 or 2+ fuzzy matches) still fails
 		// with a message that names the recovery.
 		if out, ok := fuzzyWhitespaceEdit(path, content, oldString, newString); ok {
 			return out
 		}
 		if differsOnlyInWhitespace(content, oldString) {
-			return fmt.Sprintf("(not found: no exact match in %s - a block there differs only in whitespace (indentation/tabs/newlines); copy the exact bytes, including indentation)", path)
+			return fmt.Sprintf("(not found: no exact match in %s: a block there differs only in whitespace (indentation/tabs/newlines); copy the exact bytes, including indentation)", path)
 		}
-		return fmt.Sprintf("(not found: old_string does not appear in %s - read the exact bytes back with read_file before retrying, don't retype them from memory)", path)
+		return fmt.Sprintf("(not found: old_string does not appear in %s: read the exact bytes back with read_file before retrying, don't retype them from memory)", path)
 	}
 	if n > 1 {
-		return fmt.Sprintf("(ambiguous: old_string appears %d times (lines %s) - provide more context to make it unique)", n, matchLines(content, oldString))
+		return fmt.Sprintf("(ambiguous: old_string appears %d times (lines %s): provide more context to make it unique)", n, matchLines(content, oldString))
 	}
-	// strings.Count only counts non-overlapping occurrences, so a self-
-	// overlapping old_string ("==" in "a === b") passes n == 1 yet matches at
-	// two positions with different results. Catch the overlapping second match
-	// so the exactly-once guarantee holds.
+	// strings.Count skips overlapping matches. Check again after the first
+	// match so overlapping candidates cannot make a replacement ambiguous.
 	if idx := strings.Index(content, oldString); strings.Contains(content[idx+1:], oldString) {
-		return "(ambiguous: old_string overlaps itself - provide more context to make it unique)"
+		return "(ambiguous: old_string overlaps itself: provide more context to make it unique)"
 	}
 	updated := strings.Replace(content, oldString, newString, 1)
 	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
@@ -77,20 +71,15 @@ func EditFile(path, oldString, newString string) string {
 // differsOnlyInWhitespace reports whether oldString matches content at exactly
 // one spot once every whitespace run is collapsed: i.e. the sole mismatch is
 // indentation/tabs/newlines. Bounded with spaces so a match can't straddle a
-// token boundary and mislabel an unrelated near-miss.
+// token boundary and mislabel an unrelated near miss.
 func differsOnlyInWhitespace(content, oldString string) bool {
 	norm := func(s string) string { return " " + strings.Join(strings.Fields(s), " ") + " " }
 	return strings.Count(norm(content), norm(oldString)) == 1
 }
 
-// fuzzyWhitespaceEdit applies old_string when its whitespace-collapsed token
-// sequence matches a run of WHOLE content lines at exactly one place: the
-// retyped-indentation failure (Aider measured flexible application cutting
-// edit errors ~9x; pi and opencode ship the same fallback). Whole lines only,
-// so the splice boundary is a line boundary and every surrounding byte is
-// preserved exactly; a mid-line fragment or a 0/2+ match returns ok=false and
-// leaves the instructive failure to the caller. new_string goes in as given -
-// those are the bytes the model meant to write, same as an exact match.
+// fuzzyWhitespaceEdit accepts one whole sequence of lines whose words match
+// old_string. Requiring a unique match and whole line boundaries preserves
+// surrounding content. new_string is written exactly as supplied.
 func fuzzyWhitespaceEdit(path, content, oldString, newString string) (string, bool) {
 	want := strings.Fields(oldString)
 	if len(want) == 0 {
@@ -100,7 +89,7 @@ func fuzzyWhitespaceEdit(path, content, oldString, newString string) (string, bo
 	matches, matchStart, matchEnd := 0, -1, -1
 	for i := range lines {
 		if len(strings.Fields(lines[i])) == 0 {
-			continue // a match starts on a non-blank line, keeping the region tight
+			continue // a match starts on a non blank line, keeping the region tight
 		}
 		if end := fuzzyMatchAt(lines, i, want); end >= 0 {
 			matches++
@@ -124,11 +113,11 @@ func fuzzyWhitespaceEdit(path, content, oldString, newString string) (string, bo
 	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
 		return fmt.Sprintf("(write error: %v)", err), true
 	}
-	return fmt.Sprintf("edited %s: -%d +%d bytes (old_string matched lines %d-%d only after ignoring whitespace differences; new_string was written exactly as given - re-read the region if surrounding indentation matters)",
+	return fmt.Sprintf("edited %s: -%d +%d bytes (old_string matched lines %d-%d only after ignoring whitespace differences; new_string was written exactly as given: reread the region if surrounding indentation matters)",
 		path, oldLen, len(newString), matchStart+1, matchEnd+1), true
 }
 
-// fuzzyMatchAt reports the end line of a whole-line fuzzy match of want
+// fuzzyMatchAt reports the end line of a whole line fuzzy match of want
 // starting at lines[start], or -1. Every field of every consumed line must
 // belong to want in order (old_string covered those lines entirely, modulo
 // whitespace); blank lines inside the run contribute nothing and are consumed.
@@ -149,9 +138,9 @@ func fuzzyMatchAt(lines []string, start int, want []string) int {
 	return -1
 }
 
-// matchLines names the 1-indexed line of each non-overlapping occurrence of
+// matchLines names the counted from 1 line of each non overlapping occurrence of
 // sub in content (capped at 10), so the ambiguous failure carries the
-// locations the scan already visited instead of forcing a re-read round to
+// locations the scan already visited instead of forcing a reread round to
 // find them.
 func matchLines(content, sub string) string {
 	var out []string
@@ -180,7 +169,7 @@ func EditFileSchema() map[string]any {
 		"type": "function",
 		"function": map[string]any{
 			"name":        EditFileName,
-			"description": "Surgically replace a single occurrence of old_string with new_string in an existing file. old_string must appear EXACTLY ONCE - include enough surrounding context to make it unique. Prefer this over write_file for any change to an existing file short of a full rewrite. To change several places, put several edit_file calls in the SAME message: they run in order against the file on disk, so they compose. Errors (not found, ambiguous, file missing) come back in the result string, same as bash.",
+			"description": "Surgically replace a single occurrence of old_string with new_string in an existing file. old_string must appear EXACTLY ONCE: include enough surrounding context to make it unique. Prefer this over write_file for any change to an existing file short of a full rewrite. To change several places, put several edit_file calls in the SAME message: they run in order against the file on disk, so they compose. Errors (not found, ambiguous, file missing) come back in the result string, same as bash.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -190,7 +179,7 @@ func EditFileSchema() map[string]any {
 					},
 					"old_string": map[string]any{
 						"type":        "string",
-						"description": "Exact substring to find. Must be non-empty and appear exactly once.",
+						"description": "Exact substring to find. Must be nonempty and appear exactly once.",
 					},
 					"new_string": map[string]any{
 						"type":        "string",

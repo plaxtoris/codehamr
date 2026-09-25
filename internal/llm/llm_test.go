@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/codehamr/codehamr/internal/cloud"
 	chmctx "github.com/codehamr/codehamr/internal/ctx"
 )
 
@@ -28,10 +27,8 @@ func collect(ch <-chan Event) []Event {
 
 // sseOK writes a Responses stream: each event as `event:`+`data:` the way
 // OpenAI and vLLM emit it, closed by response.completed carrying the usage.
-// The budget header travels on the 200 like in production.
 func sseOK(w http.ResponseWriter, events []string) {
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("X-Budget-Remaining", "0.73")
 	for _, e := range events {
 		writeEvent(w, e)
 	}
@@ -111,9 +108,6 @@ func TestChatStreamsContent(t *testing.T) {
 			if e.Tokens != 7 {
 				t.Errorf("tokens = %d, want 7", e.Tokens)
 			}
-			if !e.Budget.Set || e.Budget.Remaining != 0.73 {
-				t.Errorf("budget not propagated: %+v", e.Budget)
-			}
 		}
 	}
 	if content.String() != "Hello" {
@@ -138,8 +132,8 @@ func TestChatPostsToResponses(t *testing.T) {
 	}
 }
 
-// TestChatToolCall: the canonical OpenAI shape - output_item.added, argument
-// deltas, arguments.done, output_item.done - resolves to one EventToolCall and
+// TestChatToolCall: the canonical OpenAI shape: output_item.added, argument
+// deltas, arguments.done, output_item.done: resolves to one EventToolCall and
 // rides along in EventDone.Final.ToolCalls so the next round can replay it.
 func TestChatToolCall(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -260,7 +254,7 @@ func TestChatParallelToolCallsByOutputIndex(t *testing.T) {
 		}
 	}
 	if len(calls) != 2 {
-		t.Fatalf("want 2 tool-call events, got %d: %+v", len(calls), calls)
+		t.Fatalf("want 2 tool call events, got %d: %+v", len(calls), calls)
 	}
 	for i, want := range []string{"a.go", "b.go"} {
 		if got, _ := calls[i].Arguments["path"].(string); got != want {
@@ -274,7 +268,7 @@ func TestChatParallelToolCallsByOutputIndex(t *testing.T) {
 
 // TestChatToolCallMalformedArgsPreservesMarker: on invalid `arguments` JSON
 // (provider bug), the client surfaces a sentinel key rather than an empty args
-// map, so the tool-result log names what went wrong.
+// map, so the tool result log names what went wrong.
 func TestChatToolCallMalformedArgsPreservesMarker(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		sseOK(w, []string{
@@ -370,7 +364,7 @@ func TestToInputShapes(t *testing.T) {
 
 // TestToInputSkipsEmptyTextBesideCallsAndOrphanReasoning: an assistant round
 // that only called tools sends no empty text item, and a round that produced
-// nothing at all sends its (now orphaned) reasoning nowhere - a reasoning item
+// nothing at all sends its (now orphaned) reasoning nowhere: a reasoning item
 // with no following item is the one replay shape OpenAI rejects. The empty
 // message itself still goes, so history stays truthful.
 func TestToInputSkipsEmptyTextBesideCallsAndOrphanReasoning(t *testing.T) {
@@ -388,9 +382,9 @@ func TestToInputSkipsEmptyTextBesideCallsAndOrphanReasoning(t *testing.T) {
 }
 
 // TestToInputParseErrorArgsStayValidJSON: when resolve() stamps _parse_error
-// for a truncated tool call and that assistant message round-trips into the
+// for a truncated tool call and that assistant message round trips into the
 // next request, the arguments must still be VALID JSON. Otherwise every later
-// turn re-sends corrupt JSON and the backend 400s forever (session poisoning).
+// turn re sends corrupt JSON and the backend 400s forever (session poisoning).
 func TestToInputParseErrorArgsStayValidJSON(t *testing.T) {
 	items := toInput([]chmctx.Message{{
 		Role: chmctx.RoleAssistant,
@@ -407,7 +401,7 @@ func TestToInputParseErrorArgsStayValidJSON(t *testing.T) {
 }
 
 // TestChatToolsAreFlat: the Responses tool declaration has no `function`
-// wrapper; the old chat-completions nesting 400s here.
+// wrapper; the old chat completions nesting 400s here.
 func TestChatToolsAreFlat(t *testing.T) {
 	var gotBody string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -424,8 +418,8 @@ func TestChatToolsAreFlat(t *testing.T) {
 	}
 }
 
-// TestChatMidStreamErrorFrameSurfacesAsError: OpenAI-compatible proxies report
-// a post-200 provider failure as a bare `data: {"error":{...}}` frame followed
+// TestChatMidStreamErrorFrameSurfacesAsError: OpenAI compatible proxies report
+// a post 200 provider failure as a bare `data: {"error":{...}}` frame followed
 // by connection close. That frame must surface as EventError; left undecoded
 // the close reads as clean EOF and a truncated turn would be replayed or, worse,
 // finalized.
@@ -454,7 +448,7 @@ func TestChatMidStreamErrorFrameSurfacesAsError(t *testing.T) {
 	}
 }
 
-// TestChatFailedAndErrorEventsAreServerErrors: the two Responses-native
+// TestChatFailedAndErrorEventsAreServerErrors: the two Responses native
 // failure events carry the server's own diagnosis and are not replayable.
 func TestChatFailedAndErrorEventsAreServerErrors(t *testing.T) {
 	for name, frame := range map[string]string{
@@ -483,7 +477,7 @@ func TestChatFailedAndErrorEventsAreServerErrors(t *testing.T) {
 }
 
 // TestChatReadsUsageTokens: tokens come from response.completed's usage
-// (output_tokens; input_tokens rides along for the debug-log calibration), not
+// (output_tokens; input_tokens rides along for the debug log calibration), not
 // content length; we trust what the backend reports.
 func TestChatReadsUsageTokens(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -519,7 +513,7 @@ func TestChatIncompleteCompletesStream(t *testing.T) {
 	}
 }
 
-// TestSendEventUnblocksOnCancel pins sendEvent's anti-wedge invariant: once the
+// TestSendEventUnblocksOnCancel pins sendEvent's anti wedge invariant: once the
 // parent context is cancelled, a send to an undrained channel must abort via the
 // <-parent.Done() arm instead of blocking the stream goroutine forever.
 func TestSendEventUnblocksOnCancel(t *testing.T) {
@@ -536,7 +530,7 @@ func TestSendEventUnblocksOnCancel(t *testing.T) {
 			t.Fatal("sendEvent returned true for a send nobody drained; it must report false after cancel")
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("sendEvent wedged on an undrained channel after cancel - the anti-wedge <-parent.Done() arm is missing")
+		t.Fatal("sendEvent wedged on an undrained channel after cancel: the anti-wedge <-parent.Done() arm is missing")
 	}
 }
 
@@ -547,14 +541,14 @@ func TestChat401(t *testing.T) {
 	}))
 	defer srv.Close()
 	evs := collect(New(srv.URL, "m", "").Chat(context.Background(), nil, nil))
-	if len(evs) != 1 || !errors.Is(evs[0].Err, cloud.ErrUnauthorized) {
+	if len(evs) != 1 || !errors.Is(evs[0].Err, ErrUnauthorized) {
 		t.Fatalf("want ErrUnauthorized, got %+v", evs)
 	}
 }
 
 // TestChat401DrainsBodyForConnReuse: a 401 carrying a body must have that body
 // drained before close, or Go's transport discards the TCP connection instead
-// of returning it to the keep-alive pool. Two sequential 401s on one client
+// of returning it to the keep alive pool. Two sequential 401s on one client
 // must land on one connection.
 func TestChat401DrainsBodyForConnReuse(t *testing.T) {
 	var mu sync.Mutex
@@ -571,7 +565,7 @@ func TestChat401DrainsBodyForConnReuse(t *testing.T) {
 	c := New(srv.URL, "m", "")
 	for i := 0; i < 2; i++ {
 		evs := collect(c.Chat(context.Background(), nil, nil))
-		if len(evs) != 1 || !errors.Is(evs[0].Err, cloud.ErrUnauthorized) {
+		if len(evs) != 1 || !errors.Is(evs[0].Err, ErrUnauthorized) {
 			t.Fatalf("request %d: want ErrUnauthorized, got %+v", i, evs)
 		}
 	}
@@ -583,20 +577,18 @@ func TestChat401DrainsBodyForConnReuse(t *testing.T) {
 	}
 }
 
-// TestChat402: budget exhaustion surfaces as a typed error with the snapshot
-// reporting zero remaining, so the UI paints the depleted state immediately.
+// TestChat402 preserves the provider message and does not retry billing errors.
 func TestChat402(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusPaymentRequired)
+		fmt.Fprint(w, `{"error":{"message":"Insufficient credits"}}`)
 	}))
 	defer srv.Close()
 	evs := collect(New(srv.URL, "m", "k").Chat(context.Background(), nil, nil))
-	if len(evs) != 1 || !errors.Is(evs[0].Err, cloud.ErrBudgetExhausted) {
-		t.Fatalf("want ErrBudgetExhausted, got %+v", evs)
+	if len(evs) != 1 || evs[0].Err == nil || evs[0].Err.Error() != "402: Insufficient credits" {
+		t.Fatalf("expected provider billing error, got %+v", evs)
 	}
-	if !evs[0].Budget.Set || evs[0].Budget.Remaining != 0 {
-		t.Fatalf("budget snapshot should report zero remaining: %+v", evs[0].Budget)
-	}
+
 }
 
 // TestChatUnreachable: transport failure surfaces as ErrUnreachable.
@@ -607,13 +599,13 @@ func TestChatUnreachable(t *testing.T) {
 	if len(evs) != 1 {
 		t.Fatalf("want single event, got %d", len(evs))
 	}
-	var un cloud.ErrUnreachable
+	var un ErrUnreachable
 	if !errors.As(evs[0].Err, &un) {
 		t.Fatalf("want ErrUnreachable, got %v", evs[0].Err)
 	}
 }
 
-// TestChatOtherHTTPError: non-2xx (not 401/402) surfaces as a generic error
+// TestChatOtherHTTPError: non 2xx (not 401/402) surfaces as a generic error
 // carrying only the first body line.
 func TestChatOtherHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -637,7 +629,7 @@ func TestChatOtherHTTPError(t *testing.T) {
 }
 
 // TestChat404NamesTheRequirement: a route miss is the one misconfiguration the
-// body never explains (a chat-completions-only server says just "not found"),
+// body never explains (a chat completions only server says just "not found"),
 // so the error names the Responses API and the server versions that ship it.
 // vLLM also 404s an unknown model; its message must survive in front.
 func TestChat404NamesTheRequirement(t *testing.T) {
@@ -646,11 +638,11 @@ func TestChat404NamesTheRequirement(t *testing.T) {
 		fmt.Fprint(w, "{\"error\":{\"message\":\"The model `nope` does not exist.\",\"code\":404}}")
 	}))
 	defer srv.Close()
-	_, err := New(srv.URL, "nope", "").Probe(context.Background())
+	err := New(srv.URL, "nope", "").Probe(context.Background())
 	if err == nil {
 		t.Fatal("404 must fail the probe")
 	}
-	for _, want := range []string{"404", "The model `nope` does not exist.", "/v1/responses", "Ollama 0.13.3"} {
+	for _, want := range []string{"404", "The model `nope` does not exist.", "Responses API", "API base URL"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("404 error should mention %q: %v", want, err)
 		}
@@ -663,7 +655,7 @@ func TestLiteLLM404NamesTheBridge(t *testing.T) {
 		fmt.Fprint(w, `{"error":{"message":"litellm.NotFoundError: OpenAIException - 404: Not Found"}}`)
 	}))
 	defer srv.Close()
-	_, err := New(srv.URL, "local-model", "").Probe(context.Background())
+	err := New(srv.URL, "local-model", "").Probe(context.Background())
 	if err == nil {
 		t.Fatal("404 must fail the probe")
 	}
@@ -674,27 +666,6 @@ func TestLiteLLM404NamesTheBridge(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "Ollama 0.13.3") {
 		t.Errorf("proxy error must not prescribe a local server upgrade: %v", err)
-	}
-}
-
-// TestChatStructuredErrorPrefersProviderHint: the hamrpass proxy wraps upstream
-// errors as `{"error":{"message":...,"provider_hint":...}}`; provider_hint wins.
-func TestChatStructuredErrorPrefersProviderHint(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusTooManyRequests)
-		fmt.Fprint(w, `{"error":{"message":"upstream rate limited","type":"rate_limited","upstream_status":429,"provider_hint":"the upstream model is temporarily rate-limited, retry shortly"}}`)
-	}))
-	defer srv.Close()
-	c := New(srv.URL, "m", "")
-	c.RetryBackoff = nil
-	evs := collect(c.Chat(context.Background(), nil, nil))
-	if len(evs) != 1 || evs[0].Kind != EventError {
-		t.Fatalf("want single error event, got %+v", evs)
-	}
-	msg := evs[0].Err.Error()
-	if !strings.Contains(msg, "429") || !strings.Contains(msg, "retry shortly") || strings.Contains(msg, "upstream rate limited") {
-		t.Fatalf("provider_hint should win over message, with the status: %v", msg)
 	}
 }
 
@@ -720,8 +691,8 @@ func TestChatStructuredErrorFallsBackToMessage(t *testing.T) {
 }
 
 // TestChatFallsBackWhenReasoningRejected: each dialect's refusal of the
-// reasoning effort - Ollama's non-thinking model, vLLM's scale without our
-// value, OpenAI's non-reasoning model - drops the field, retries once, and
+// reasoning effort: Ollama's non thinking model, vLLM's scale without our
+// value, OpenAI's non reasoning model: drops the field, retries once, and
 // stays sticky for the Client's life so later turns don't burn a 400 each.
 func TestChatFallsBackWhenReasoningRejected(t *testing.T) {
 	for name, body := range map[string]string{
@@ -775,7 +746,7 @@ func TestChatDoesNotFallBackOnUnrelatedThinking(t *testing.T) {
 		b, _ := io.ReadAll(r.Body)
 		bodies = append(bodies, string(b))
 		w.WriteHeader(400)
-		fmt.Fprintln(w, `{"error":{"message":"the requested tool format is not supported","provider_hint":"thinking about it differently won't help"}}`)
+		fmt.Fprintln(w, `{"error":{"message":"the requested tool format is not supported","details":"thinking about it differently won't help"}}`)
 	}))
 	defer srv.Close()
 
@@ -811,7 +782,7 @@ func TestProbeChatNoReasoningIsRaceFree(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			_, _ = c.Probe(context.Background())
+			_ = c.Probe(context.Background())
 		}()
 		go func() {
 			defer wg.Done()
@@ -822,32 +793,31 @@ func TestProbeChatNoReasoningIsRaceFree(t *testing.T) {
 }
 
 // TestProbeSendsMinimalRequest: the probe is a hello with no tools and no
-// reasoning (so its 400 can never trip the fallback), and it reads the live
-// window and budget off the headers.
+// reasoning, and its output is capped to keep activation inexpensive.
 func TestProbeSendsMinimalRequest(t *testing.T) {
 	var gotBody string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		gotBody = string(b)
-		w.Header().Set("X-Context-Window", "131072")
 		sseOK(w, []string{completed(0, 0)})
 	}))
 	defer srv.Close()
-	res, err := New(srv.URL, "m", "k").Probe(context.Background())
+	err := New(srv.URL, "m", "k").Probe(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(gotBody, `"reasoning"`) || strings.Contains(gotBody, `"tools"`) {
 		t.Fatalf("probe must send neither reasoning nor tools: %s", gotBody)
 	}
-	if res.ContextWindow != 131072 || !res.Budget.Set || res.Budget.Remaining != 0.73 {
-		t.Fatalf("probe should harvest headers: %+v", res)
+	if !strings.Contains(gotBody, `"max_output_tokens":16`) {
+		t.Fatal("probe must cap output tokens")
 	}
+
 }
 
 // TestNewHasNoHTTPTimeout pins that the streaming Client must NOT set
-// http.Client.Timeout: that field is end-to-end (it covers body reads) and would
-// abort a legitimately slow SSE stream. Per-turn context cancellation governs
+// http.Client.Timeout: that field is end to end (it covers body reads) and would
+// abort a legitimately slow SSE stream. Per turn context cancellation governs
 // request lifetime.
 func TestNewHasNoHTTPTimeout(t *testing.T) {
 	c := New("http://example.test", "model", "token")
@@ -857,7 +827,7 @@ func TestNewHasNoHTTPTimeout(t *testing.T) {
 }
 
 // TestIdleTimeoutFromEnv pins the CODEHAMR_IDLE_TIMEOUT contract: a Go duration
-// or bare-seconds string wins, anything else (unset, garbage, non-positive)
+// or bare seconds string wins, anything else (unset, garbage, nonpositive)
 // falls back to the default.
 func TestIdleTimeoutFromEnv(t *testing.T) {
 	cases := []struct {
@@ -875,7 +845,7 @@ func TestIdleTimeoutFromEnv(t *testing.T) {
 		{val: "-5m", set: true, want: streamIdleTimeout},
 		// Bare seconds large enough to wrap the ×time.Second multiply to a
 		// small POSITIVE duration must fall back, not silently kill every
-		// live-but-slow stream mid-prefill.
+		// live but slow stream mid prefill.
 		{val: "18446744074", set: true, want: streamIdleTimeout},
 		{val: "9000000000", set: true, want: 9_000_000_000 * time.Second},
 	}
@@ -918,11 +888,11 @@ func TestChatIdleTimeoutAbortsStalledStream(t *testing.T) {
 		t.Fatalf("expected an EventError naming the stall, got %v", gotErr)
 	}
 	if elapsed := time.Since(start); elapsed > 2*time.Second {
-		t.Fatalf("watchdog fired too late (%v) - should be ~IdleTimeout", elapsed)
+		t.Fatalf("watchdog fired too late (%v): should be ~IdleTimeout", elapsed)
 	}
 }
 
-// TestChatIdleWatchdogResetByFrames pins that an alive-but-slow stream is NOT
+// TestChatIdleWatchdogResetByFrames pins that an alive but slow stream is NOT
 // aborted: frames spaced under the idle window each reset the watchdog, so a
 // stream whose total span exceeds one window still completes.
 func TestChatIdleWatchdogResetByFrames(t *testing.T) {
@@ -958,7 +928,7 @@ func TestChatIdleWatchdogResetByFrames(t *testing.T) {
 
 // TestChatRetriesTransient404: a proxy that hiccups (two 404s, then a clean
 // stream) is retried transparently. The user sees one EventRetry per wait,
-// then normal content - never an EventError.
+// then normal content: never an EventError.
 func TestChatRetriesTransient404(t *testing.T) {
 	attempts := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -1083,7 +1053,7 @@ func TestRetryableClassification(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"unreachable", cloud.ErrUnreachable{Err: errors.New("refused")}, true},
+		{"unreachable", ErrUnreachable{Err: errors.New("refused")}, true},
 		{"404", &httpStatusError{status: 404, msg: "not found"}, true},
 		{"408", &httpStatusError{status: 408, msg: "timeout"}, true},
 		{"429", &httpStatusError{status: 429, msg: "rate limited"}, true},
@@ -1091,8 +1061,8 @@ func TestRetryableClassification(t *testing.T) {
 		{"503", &httpStatusError{status: 503, msg: "down"}, true},
 		{"400", &httpStatusError{status: 400, msg: "bad request"}, false},
 		{"403", &httpStatusError{status: 403, msg: "forbidden"}, false},
-		{"unauthorized", cloud.ErrUnauthorized, false},
-		{"depleted", cloud.ErrBudgetExhausted, false},
+		{"unauthorized", ErrUnauthorized, false},
+		{"payment required", &httpStatusError{status: 402, msg: "Insufficient credits"}, false},
 		{"misc", errors.New("something"), false},
 	}
 	for _, tc := range cases {
@@ -1113,7 +1083,7 @@ func TestProbeDoesNotRetry(t *testing.T) {
 	defer srv.Close()
 
 	c := New(srv.URL, "m", "")
-	if _, err := c.Probe(context.Background()); err == nil {
+	if err := c.Probe(context.Background()); err == nil {
 		t.Fatal("probe against a 404 backend must fail")
 	}
 	if attempts != 1 {
@@ -1130,7 +1100,7 @@ func TestChatMidStreamDropIsReplayable(t *testing.T) {
 		writeEvent(w, textDelta("partial"))
 		w.(http.Flusher).Flush()
 		conn, _, _ := w.(http.Hijacker).Hijack()
-		conn.Close() // drop the socket mid-stream
+		conn.Close() // drop the socket mid stream
 	}))
 	defer srv.Close()
 	var errEvt *Event
@@ -1146,7 +1116,7 @@ func TestChatMidStreamDropIsReplayable(t *testing.T) {
 
 // TestKeepaliveDoesNotCollapseThePrefillWindow: a proxy that emits one comment
 // or blank line at 200 OK is liveness, not output. Treating it as output would
-// swap the long prefill window for the short inter-frame one while the model is
+// swap the long prefill window for the short inter frame one while the model is
 // still prefilling, and mark the resulting DETERMINISTIC prefill stall as a
 // replayable drop. An `event:` name line without its data is liveness too.
 func TestKeepaliveDoesNotCollapseThePrefillWindow(t *testing.T) {
@@ -1189,10 +1159,10 @@ func TestKeepaliveDoesNotCollapseThePrefillWindow(t *testing.T) {
 }
 
 // TestChatCleanEOFWithoutCompletionIsMidStreamDrop: a proxy/LB that gracefully
-// closes the upstream mid-generation produces a clean EOF with no
+// closes the upstream mid generation produces a clean EOF with no
 // response.completed. That must surface as a MidStream EventError (so the TUI's
-// bounded replay re-issues the request), never as EventDone: finalizing it
-// hands the turn a mid-sentence-truncated assistant message as a clean finish.
+// bounded replay reissues the request), never as EventDone: finalizing it
+// hands the turn a mid sentence truncated assistant message as a clean finish.
 func TestChatCleanEOFWithoutCompletionIsMidStreamDrop(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")

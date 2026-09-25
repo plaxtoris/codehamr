@@ -18,7 +18,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/codehamr/codehamr/internal/cloud"
 	"github.com/codehamr/codehamr/internal/config"
 	chmctx "github.com/codehamr/codehamr/internal/ctx"
 	"github.com/codehamr/codehamr/internal/llm"
@@ -38,7 +37,7 @@ func newTestModel(t *testing.T, handler http.HandlerFunc) Model {
 		t.Fatal(err)
 	}
 	cfg.ActiveProfile().URL = srv.URL
-	// Persist so the reload-on-slash path reads the mock URL back, not the
+	// Persist so the reload on slash path reads the mock URL back, not the
 	// seeded localhost default.
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
@@ -68,8 +67,8 @@ func TestSystemPromptIncludesWorkingDirAndInvestigateRule(t *testing.T) {
 }
 
 // TestSystemPromptFitsFixedSystemReservation pins ctx.FixedSystem against the
-// embedded prompt. Grow the prompt past the reservation and Pack over-allocates
-// to history on small-ctx profiles, so the next request exceeds the server's
+// embedded prompt. Grow the prompt past the reservation and Pack over allocates
+// to history on small ctx profiles, so the next request exceeds the server's
 // limit and 400s (or is silently truncated). On failure, raise ctx.FixedSystem;
 // don't loosen the assertion.
 func TestSystemPromptFitsFixedSystemReservation(t *testing.T) {
@@ -77,7 +76,7 @@ func TestSystemPromptFitsFixedSystemReservation(t *testing.T) {
 	m := New(cfg, llm.New("http://x", cfg.ActiveProfile().LLM, ""), "/workspaces/codehamr", "test")
 	cost := chmctx.Message{Role: chmctx.RoleSystem, Content: m.system}.Tokens()
 	if cost > chmctx.FixedSystem {
-		t.Fatalf("system prompt costs %d tokens, FixedSystem reserves only %d - "+
+		t.Fatalf("system prompt costs %d tokens, FixedSystem reserves only %d: "+
 			"raise ctx.FixedSystem so Budget() doesn't over-allocate to history",
 			cost, chmctx.FixedSystem)
 	}
@@ -95,14 +94,14 @@ func TestCtrlDEmptyQuits(t *testing.T) {
 	}
 }
 
-// TestCtrlDNonEmptyNoOp: Ctrl+D with text in the textarea is a no-op: no
+// TestCtrlDNonEmptyNoOp: Ctrl+D with text in the textarea is a no operation: no
 // quit and no character deletion.
 func TestCtrlDNonEmptyNoOp(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.ta.SetValue("half-written prompt")
 	out, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
 	if cmd != nil {
-		t.Fatal("Ctrl+D with non-empty input must not quit")
+		t.Fatal("Ctrl+D with nonempty input must not quit")
 	}
 	if got := out.(Model).ta.Value(); got != "half-written prompt" {
 		t.Fatalf("textarea was modified: %q", got)
@@ -112,7 +111,7 @@ func TestCtrlDNonEmptyNoOp(t *testing.T) {
 // TestCtrlDMidTurnDoesNotQuit: the textarea is empty during a running turn
 // (submit resets it), so without the phase gate a reflexive Ctrl+D would quit
 // instantly, skipping turnCtx cancel and orphaning a running tool's process
-// group. Ctrl+C is the mid-turn escape; Ctrl+D must be inert until idle.
+// group. Ctrl+C is the mid turn escape; Ctrl+D must be inert until idle.
 func TestCtrlDMidTurnDoesNotQuit(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.phase = phaseThinking
@@ -160,7 +159,7 @@ func TestCtrlCIdleArmsThenQuits(t *testing.T) {
 }
 
 // TestCtrlCPopoverClosesInsteadOfQuitting: with the popover open and no
-// in-flight op, Ctrl+C dismisses the popover and does not arm quit.
+// in flight op, Ctrl+C dismisses the popover and does not arm quit.
 func TestCtrlCPopoverClosesInsteadOfQuitting(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	mm := typeInto(m, "/")
@@ -211,7 +210,7 @@ func TestCtrlCCancelsInflightOp(t *testing.T) {
 }
 
 // TestNonCtrlCKeypressResetsArming: once arming is live, pressing anything
-// other than Ctrl+C clears the arm so the next idle Ctrl+C re-arms cleanly
+// other than Ctrl+C clears the arm so the next idle Ctrl+C rearms cleanly
 // (no accidental quits).
 func TestNonCtrlCKeypressResetsArming(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -227,7 +226,7 @@ func TestNonCtrlCKeypressResetsArming(t *testing.T) {
 }
 
 // typeInto feeds text one rune at a time, as a keyboard would, exercising the
-// refreshSuggest hook on the KeyRunes fall-through.
+// refreshSuggest hook on the KeyRunes fall through.
 func typeInto(m Model, text string) Model {
 	var mm tea.Model = m
 	for _, r := range text {
@@ -275,7 +274,7 @@ func TestPopoverClosesWhenPrefixMatchesNothing(t *testing.T) {
 }
 
 // TestPopoverTabCyclesSelection: Tab moves the selection to the next row
-// without touching the textarea, zsh-style cycling.
+// without touching the textarea, zsh style cycling.
 func TestPopoverTabCyclesSelection(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	mm := typeInto(m, "/")
@@ -325,7 +324,7 @@ func TestPopoverTabOnEmptyOpensCommandList(t *testing.T) {
 
 // TestPopoverTabCompletesUniquePrefix: with one match, Tab completes the name
 // and, because /models takes args, appends a space that flips the popover into
-// arg-level mode. Flow: "/mod<Tab>" → "/models " + arg popover.
+// arg level mode. Flow: "/mod<Tab>" → "/models " + arg popover.
 func TestPopoverTabCompletesUniquePrefix(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	mm := typeInto(m, "/mod") // only /models matches
@@ -372,9 +371,9 @@ func TestPopoverShiftTabCyclesUp(t *testing.T) {
 	}
 }
 
-// TestEscFromCommandLevelClosesAndClears: Esc at command-level closes the
+// TestEscFromCommandLevelClosesAndClears: Esc at command level closes the
 // popover AND clears the textarea, so the user returns to a blank prompt.
-// Typing "/" from the blank slate re-opens the popover from scratch.
+// Typing "/" from the blank slate reopens the popover from scratch.
 func TestEscFromCommandLevelClosesAndClears(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	mm := typeInto(m, "/")
@@ -386,7 +385,7 @@ func TestEscFromCommandLevelClosesAndClears(t *testing.T) {
 	if om.ta.Value() != "" {
 		t.Fatalf("Esc at command-level should clear textarea, got %q", om.ta.Value())
 	}
-	// Typing "/" from a blank slate re-opens the popover.
+	// Typing "/" from a blank slate reopens the popover.
 	mm3 := typeInto(om, "/")
 	if !mm3.popoverOpen() {
 		t.Fatal("typing '/' after Esc should re-open popover")
@@ -411,8 +410,8 @@ func TestPopoverArrowKeysMoveSelection(t *testing.T) {
 	}
 }
 
-// TestPopoverEnterAdvancesIntoArgsForArgsCommand: Enter at command-level on a
-// command that takes args does NOT submit: it opens the arg-level popover,
+// TestPopoverEnterAdvancesIntoArgsForArgsCommand: Enter at command level on a
+// command that takes args does NOT submit: it opens the arg level popover,
 // same as Tab.
 func TestPopoverEnterAdvancesIntoArgsForArgsCommand(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -431,11 +430,11 @@ func TestPopoverEnterAdvancesIntoArgsForArgsCommand(t *testing.T) {
 	}
 	// scroll should NOT contain a submitted /models, nothing has been sent yet
 	if strings.Contains(om.scroll.String(), "▌ /models") {
-		t.Fatalf("Enter must not have submitted - scroll: %s", om.scroll.String())
+		t.Fatalf("Enter must not have submitted: scroll: %s", om.scroll.String())
 	}
 }
 
-// TestPopoverEnterSubmitsNoArgCommand: Enter at command-level on a command
+// TestPopoverEnterSubmitsNoArgCommand: Enter at command level on a command
 // without args still submits immediately (/clear).
 func TestPopoverEnterSubmitsNoArgCommand(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -461,9 +460,7 @@ func TestPopoverEnterSubmitsNoArgCommand(t *testing.T) {
 // "next", Tab cycles instead) with the active profile preselected.
 func TestArgPopoverOpensForModels(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	// Bootstrap seeds local + hamrpass; drop the latter so this asserts popover
-	// content, not config defaults.
-	delete(m.cfg.Models, "hamrpass")
+	// Add a second profile to exercise argument completion.
 	m.cfg.Models["remote"] = &config.Profile{
 		LLM: "cloud-model", URL: "http://r", Key: "sk-r", ContextSize: 200000,
 	}
@@ -487,7 +484,7 @@ func TestArgPopoverOpensForModels(t *testing.T) {
 	}
 }
 
-// TestHistoryUpDownReplayLastSubmission: ↑ on first-line replaces textarea
+// TestHistoryUpDownReplayLastSubmission: ↑ on first line replaces textarea
 // with the most recent submitted line; ↓ steps back toward the draft.
 func TestHistoryUpDownReplayLastSubmission(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -556,7 +553,7 @@ func TestHistoryPushesOnSubmit(t *testing.T) {
 	}
 }
 
-// TestBackendLabelShowsActiveProfile: the label echoes the currently-active
+// TestBackendLabelShowsActiveProfile: the label echoes the currently active
 // profile name. Default Bootstrap ships one profile called "local". No
 // brackets: the label is just the name (bold).
 func TestBackendLabelShowsActiveProfile(t *testing.T) {
@@ -582,7 +579,7 @@ func TestBackendLabelShowsActiveProfile(t *testing.T) {
 func TestPrintHelpListsAllCommands(t *testing.T) {
 	var buf bytes.Buffer
 	PrintHelp(&buf)
-	for _, want := range []string{"/clear", "/models", "/hamrpass"} {
+	for _, want := range []string{"/clear", "/models"} {
 		if !strings.Contains(buf.String(), want) {
 			t.Fatalf("PrintHelp missing %q:\n%s", want, buf.String())
 		}
@@ -615,69 +612,8 @@ func TestSlashModelSwitchesActive(t *testing.T) {
 	}
 }
 
-// TestRedactSlashHidesHamrpassKey: with `logging: true`, every prompt (including
-// `/hamrpass <key>`) is written to .codehamr/log.txt. The log is meant to be
-// easy to share for bug reports, so a key in there is a quiet leak even at 0o600.
-// redactSlash is the seam every dbgWritef on a slash payload routes through.
-func TestRedactSlashHidesHamrpassKey(t *testing.T) {
-	cases := map[string]string{
-		"/hamrpass hp_secret_1234567890abcdef": "/hamrpass <redacted>",
-		"/hamrpass":                            "/hamrpass",  // no arg, nothing to redact
-		"/hamrpass ":                           "/hamrpass ", // trailing space, no key to redact
-		"/clear":                               "/clear",     // unrelated commands pass through
-		"/models hamrpass":                     "/models hamrpass",
-		"hello /hamrpass key":                  "hello /hamrpass key", // not at line start = not a hamrpass invocation
-		// Multi-line / tab-separated: Alt+Enter inserts a literal newline, and
-		// runSlash's strings.Fields splits on any whitespace, so the key activates.
-		// redactSlash must tokenise the same way or the key survives in log.txt.
-		"/hamrpass\nhp_secret_1234567890abcdef":  "/hamrpass <redacted>",
-		"/hamrpass\thp_secret_1234567890abcdef":  "/hamrpass <redacted>",
-		"  /hamrpass hp_secret_1234567890abcdef": "/hamrpass <redacted>",
-		// Case-folded name: /HamrPass doesn't activate the key (dispatch is
-		// case-sensitive) but submit still routes through redactSlash, so the
-		// token must not survive into scrollback, recall, history, or log.txt.
-		"/HamrPass hp_secret_1234567890abcdef": "/hamrpass <redacted>",
-		"/HAMRPASS hp_secret_1234567890abcdef": "/hamrpass <redacted>",
-	}
-	for in, want := range cases {
-		if got := redactSlash(in); got != want {
-			t.Errorf("redactSlash(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// TestSubmitRedactsHamrpassKeyFromHistoryAndScroll: redactSlash keeps the bearer
-// token out of the debug log, but submit must also keep it out of scrollback
-// (re-emitted verbatim on every resize), the ↑/↓ recall ring, and the on-disk
-// .codehamr/history. The redacted marker is what lands in recall and on disk.
-func TestSubmitRedactsHamrpassKeyFromHistoryAndScroll(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	dir := m.cfg.Dir
-	const key = "hp_secret_1234567890abcdef"
-	line := "/hamrpass " + key
-	mm, _ := m.submit(line, line, promptEntry{display: line})
-	final := mm.(Model)
-
-	// Scrollback echo (also the buffer replayed on every resize).
-	if scroll := final.scroll.String(); strings.Contains(scroll, key) {
-		t.Fatalf("scrollback leaked hamrpass key:\n%s", scroll)
-	}
-	if scroll := stripANSI(final.scroll.String()); !strings.Contains(scroll, "/hamrpass <redacted>") {
-		t.Fatalf("scrollback echo should show the redacted marker, got:\n%s", scroll)
-	}
-	// In-memory ↑/↓ recall ring.
-	if len(final.promptHistory) != 1 || final.promptHistory[0].display != "/hamrpass <redacted>" {
-		t.Fatalf("recall ring should carry the redacted marker, got %+v", final.promptHistory)
-	}
-	// On-disk .codehamr/history.
-	disk := loadPromptHistory(dir)
-	if len(disk) != 1 || disk[0].display != "/hamrpass <redacted>" {
-		t.Fatalf("on-disk history should carry the redacted marker, got %+v", disk)
-	}
-}
-
-// TestDebugLogFilePermsAreOwnerOnly: the log captures every prompt and tool-call
-// payload: bash args can carry heredoc secrets, so a world-readable log leaks
+// TestDebugLogFilePermsAreOwnerOnly: the log captures every prompt and tool call
+// payload: bash args can carry heredoc secrets, so a world readable log leaks
 // them. 0o600 only.
 func TestDebugLogFilePermsAreOwnerOnly(t *testing.T) {
 	dir := t.TempDir()
@@ -692,10 +628,10 @@ func TestDebugLogFilePermsAreOwnerOnly(t *testing.T) {
 	}
 }
 
-// TestVerboseLogCapturesTurnRecords drives a realistic two-round turn (reasoning
+// TestVerboseLogCapturesTurnRecords drives a realistic two round turn (reasoning
 // → bash tool call → final answer) with logging on, and asserts the verbose
 // records that make a session reconstructable for later debugging actually land
-// in log.txt: the session header, the per-round request/packing summary, the
+// in log.txt: the session header, the per round request/packing summary, the
 // streamed reasoning, the tool result, and the round/turn metrics. Also pins the
 // dated timestamp: a bare clock can't be correlated across a day boundary. This
 // is the regression guard against a refactor silently gutting the debug log.
@@ -733,11 +669,11 @@ func TestVerboseLogCapturesTurnRecords(t *testing.T) {
 	for _, want := range []string{
 		"] session", "context_size=", // backend + budget header
 		"] user", "inspect the repo", // the prompt
-		"] request", "packed=", // per-round packing summary
-		"] reasoning", "let me check the file", // streamed chain-of-thought
+		"] request", "packed=", // per round packing summary
+		"] reasoning", "let me check the file", // streamed chain of thought
 		"] tool_result",            // the bash result
 		"] assistant",              // final assistant message
-		"] round_done", "elapsed=", // per-round metrics
+		"] round_done", "elapsed=", // per round metrics
 		"] turn_end", // turn totals
 	} {
 		if !strings.Contains(logStr, want) {
@@ -753,16 +689,16 @@ func TestVerboseLogCapturesTurnRecords(t *testing.T) {
 }
 
 // TestCtxPressureTripwire: the round_done companion warning fires only when the
-// server-counted prompt reaches 95% of the active window. The char/4 packer
-// undercounts code-heavy history (~1.6x measured on a real run), so the server
+// server counted prompt reaches 95% of the active window. The bytes/4 packer
+// undercounts code heavy history (~1.6x measured on a real run), so the server
 // count is the only signal that the real prompt is about to spill past the
-// window into silent server-side truncation.
+// window into silent server side truncation.
 func TestCtxPressureTripwire(t *testing.T) {
 	dir := t.TempDir()
 	OpenDebugLog(dir)
 	t.Cleanup(CloseDebugLog)
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.liveContextSize[m.cfg.Active] = 10000
+	m.cfg.ActiveProfile().ContextSize = 10000
 
 	m.applyDone(llm.Event{PromptTokens: 9499}) // below threshold: silent
 	m.applyDone(llm.Event{})                   // server reported nothing: silent
@@ -805,27 +741,6 @@ func TestSlashModelSwitchDropsStickyFallbackState(t *testing.T) {
 	}
 }
 
-// TestSlashModelSwitchClearsStaleBudget: after a hamrpass turn leaves m.budget
-// set, switching to a profile that emits no X-Budget-* headers (local Ollama)
-// would keep rendering the old percentage forever; StatusSuffix only checks
-// .Set, not which profile produced it. rebuildClient must drop the cached
-// snapshot so the segment disappears until a new backend reports its own.
-func TestSlashModelSwitchClearsStaleBudget(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.Models["local"] = &config.Profile{
-		LLM: "local-model", URL: "http://ollama:11434", Key: "", ContextSize: 32000,
-	}
-	m.budget = cloud.BudgetStatus{Set: true, Remaining: 0.88}
-	out, _ := m.runSlash("/models local")
-	final := out.(Model)
-	if final.budget.Set {
-		t.Fatalf("switching profiles must clear cached BudgetStatus, got %+v", final.budget)
-	}
-	if suf := final.budget.StatusSuffix(); suf != "" {
-		t.Fatalf("status suffix must be empty after switch, got %q", suf)
-	}
-}
-
 // TestSlashModelRejectsUnknown: unknown name is a quiet warn, not a switch.
 func TestSlashModelRejectsUnknown(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -849,7 +764,7 @@ func TestSlashClearResetsHistory(t *testing.T) {
 }
 
 // TestSlashClearWipesTerminalScrollback: tea.ClearScreen (\x1b[2J) clears only
-// the visible region; the saved-lines buffer needs the DECSED 3 sequence from
+// the visible region; the saved lines buffer needs the DECSED 3 sequence from
 // eraseScrollback. /clear must emit both, or prior lines stay scrollable above
 // the reset banner.
 func TestSlashClearWipesTerminalScrollback(t *testing.T) {
@@ -859,17 +774,17 @@ func TestSlashClearWipesTerminalScrollback(t *testing.T) {
 		t.Error("/clear must wipe the visible viewport via tea.ClearScreen")
 	}
 	if !cmdYieldsScrollbackErase(cmd) {
-		t.Error("/clear must also emit eraseScrollback (\\x1b[3J) - otherwise old replies stay scrollable above the reset banner")
+		t.Error("/clear must also emit eraseScrollback (\\x1b[3J): otherwise old replies stay scrollable above the reset banner")
 	}
 }
 
 // TestArgPopoverReloadsCfgOnEntry: the arg popover builds its list from
 // m.cfg.Models. Without the cmd→arg reload in refreshSuggest, the first
-// "/models " sees stale in-memory cfg and misses a hand-added profile;
-// reload-at-popover-open makes it visible on the first entry, not the second.
+// "/models " sees stale in memory cfg and misses a hand added profile;
+// reload at popover open makes it visible on the first entry, not the second.
 func TestArgPopoverReloadsCfgOnEntry(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	// Hand-write a "remote" profile straight to config.yaml, bypassing
+	// Hand write a "remote" profile straight to config.yaml, bypassing
 	// cfg.Save(): simulates an external editor.
 	yaml := []byte(`active: local
 models:
@@ -897,10 +812,10 @@ models:
 	}
 }
 
-// TestArgPopoverSkipsConfigReloadMidTurn: typing is allowed mid-turn, but the
+// TestArgPopoverSkipsConfigReloadMidTurn: typing is allowed mid turn, but the
 // cmd→arg popover transition must not reload config then: a reload can
-// rebuildClient and swap the live llm.Client (and zero the budget) under the
-// in-flight turn. The stale list is fine; submit is phase-gated and runSlash
+// rebuildClient and swap the live llm.Client under the
+// in flight turn. The stale list is fine; submit is phase gated and runSlash
 // reloads once the turn is over.
 func TestArgPopoverSkipsConfigReloadMidTurn(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -931,12 +846,12 @@ models:
 	}
 }
 
-// TestRunSlashPicksUpExternalConfigEdits: runSlash re-reads
-// .codehamr/config.yaml before dispatching, so a profile a user hand-added
-// to the file mid-session shows up on the next /models without a restart.
+// TestRunSlashPicksUpExternalConfigEdits: runSlash rereads
+// .codehamr/config.yaml before dispatching, so a profile a user hand added
+// to the file mid session shows up on the next /models without a restart.
 func TestRunSlashPicksUpExternalConfigEdits(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	// Hand-write a config adding "remote" alongside the seeded local,
+	// Hand write a config adding "remote" alongside the seeded local,
 	// bypassing cfg.Save(): what a user would do in an external editor.
 	yaml := []byte(`active: local
 models:
@@ -960,15 +875,15 @@ models:
 	out, _ := m.runSlash("/models")
 	final := out.(Model)
 	if _, ok := final.cfg.Models["remote"]; !ok {
-		t.Fatalf("external edit not picked up - Models keys: %v",
+		t.Fatalf("external edit not picked up: Models keys: %v",
 			final.cfg.ModelNames())
 	}
 }
 
 // TestRunSlashWarnsOnBrokenConfig: a typo in config.yaml must not lock the
-// user out of slash commands. The reload prints a one-line warning and
-// keeps the previous in-memory cfg, so /models (and further editing) keep
-// working with last-known-good state.
+// user out of slash commands. The reload prints a one line warning and
+// keeps the previous in memory cfg, so /models (and further editing) keep
+// working with last known good state.
 func TestRunSlashWarnsOnBrokenConfig(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	prevActive := m.cfg.Active
@@ -1065,7 +980,7 @@ func TestToolCallRoundTripExecutesBash(t *testing.T) {
 	}
 	// The frozen run summary must sum tokens across both LLM rounds, not
 	// overwrite. Round 1 reports usage.completion_tokens=5, round 2 reports 1.
-	// finalizeTurn freezes turnTokens into lastTokens (the avg-rate divisor). Sum = 6.
+	// finalizeTurn freezes turnTokens into lastTokens (the avg rate divisor). Sum = 6.
 	if final.lastTokens != 6 {
 		t.Fatalf("per-turn tokens should sum across rounds (5+1), got %d", final.lastTokens)
 	}
@@ -1075,13 +990,13 @@ func TestToolCallRoundTripExecutesBash(t *testing.T) {
 	}
 }
 
-// TestToolArgsStreamBumpsEstimateAndPhase: a tool-call argument fragment (a file
+// TestToolArgsStreamBumpsEstimateAndPhase: a tool call argument fragment (a file
 // streaming into write_file) ticks the live token estimate AND flips the phase
 // to "generating", so the counter doesn't freeze through a long file write: the
 // bug where only chat content and reasoning were counted, not tool arguments.
 func TestToolArgsStreamBumpsEstimateAndPhase(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.phase = phaseThinking // a tool-only round starts here, before any content
+	m.phase = phaseThinking // a tool only round starts here, before any content
 	out, _ := m.handleStream(llm.Event{Kind: llm.EventToolArgs, Content: strings.Repeat("x", 40)})
 	m = out.(Model)
 	if m.phase != phaseStreaming {
@@ -1114,7 +1029,7 @@ func TestBuildToolsExposesExactlyFourTools(t *testing.T) {
 	}
 }
 
-// TestTurnEndsWhenAssistantEmitsNoToolCalls pins the turn-end contract: a final
+// TestTurnEndsWhenAssistantEmitsNoToolCalls pins the turn end contract: a final
 // assistant message with no tool calls returns to phaseIdle and hands control
 // back: no nudge, no forced tool, no extra message appended to history.
 func TestTurnEndsWhenAssistantEmitsNoToolCalls(t *testing.T) {
@@ -1148,8 +1063,8 @@ func TestTurnEndsWhenAssistantEmitsNoToolCalls(t *testing.T) {
 }
 
 // TestHandleStreamClosedEndsTurnWithNoPending: handleStreamClosed with an empty
-// pending queue finalizes the turn, returns to idle, and returns no follow-up
-// Cmd: nothing to enforce, no re-entry into chat.
+// pending queue finalizes the turn, returns to idle, and returns no follow up
+// Cmd: nothing to enforce, no reentry into chat.
 func TestHandleStreamClosedEndsTurnWithNoPending(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.phase = phaseStreaming
@@ -1175,7 +1090,7 @@ func TestHandleStreamClosedEndsTurnWithNoPending(t *testing.T) {
 }
 
 // runTurn wires a model against handler, submits `text`, drains the command
-// chain, and returns the Model. token, when non-empty, is installed on both the
+// chain, and returns the Model. token, when nonempty, is installed on both the
 // active profile and the live llm.Client so cloud auth headers travel as in
 // production.
 func runTurn(t *testing.T, handler http.HandlerFunc, token, text string) Model {
@@ -1188,55 +1103,6 @@ func runTurn(t *testing.T, handler http.HandlerFunc, token, text string) Model {
 	mm, cmd := m.submit(text, text, promptEntry{display: text})
 	out, _ := drain(mm, cmd)
 	return out.(Model)
-}
-
-// budgetResponseHandler is a test LLM endpoint that answers with a single
-// "ok" message plus the budget header, using OpenAI SSE format.
-func budgetResponseHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("X-Budget-Remaining", "0.73")
-	fmt.Fprintf(w, "data: %s\n\n", `{"type":"response.output_text.delta","delta":"ok"}`)
-	fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"response\":{}}\n\n")
-}
-
-// TestHandleProbeSuccessUpdatesLiveCtxAndPrintsActivation: a successful probeMsg
-// writes the live context window into liveContextSize (per profile) and prints
-// the deferred "✓ active: ..." line with a "ctx: ..." suffix from that window.
-func TestHandleProbeSuccessUpdatesLiveCtxAndPrintsActivation(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.Active = "hamrpass"
-	out, _ := m.handleProbe(probeMsg{profile: "hamrpass", cli: m.cli, contextWindow: 262144})
-	final := out.(Model)
-	if got := final.liveContextSize["hamrpass"]; got != 262144 {
-		t.Fatalf("liveContextSize[hamrpass] = %d, want 262144", got)
-	}
-	if !final.connected {
-		t.Fatal("successful probe must set connected=true")
-	}
-	scroll := stripANSI(final.scroll.String())
-	if !strings.Contains(scroll, "✓ active: hamrpass") {
-		t.Fatalf("expected activation line, got:\n%s", scroll)
-	}
-	if !strings.Contains(scroll, "ctx: 262,144") {
-		t.Fatalf("expected ctx suffix in activation line, got:\n%s", scroll)
-	}
-}
-
-// TestProbeForVanishedProfileLeavesNoOrphanMapEntry: probeMsg must check the
-// targeted profile still exists before writing liveContextSize, or rapid /models
-// switches with probes in flight accumulate orphan keys for dropped profiles.
-func TestProbeForVanishedProfileLeavesNoOrphanMapEntry(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	// Simulate the user having already removed the targeted profile.
-	delete(m.cfg.Models, "vanished-profile")
-
-	out, _ := m.handleProbe(probeMsg{
-		profile:       "vanished-profile",
-		contextWindow: 262144,
-	})
-	if _, ok := out.(Model).liveContextSize["vanished-profile"]; ok {
-		t.Fatalf("liveContextSize gained an orphan entry for a profile that no longer exists")
-	}
 }
 
 // TestStalePingForOldBackendDoesNotOverwriteConnectedFlag: a ping launched
@@ -1262,7 +1128,7 @@ func TestStalePingForOldBackendDoesNotOverwriteConnectedFlag(t *testing.T) {
 }
 
 // TestStaleProbeForOldProfileDoesNotOverwriteConnectedFlag mirrors the pingMsg
-// guard for probeMsg: a probe for a no-longer-active profile must not mutate the
+// guard for probeMsg: a probe for a no longer active profile must not mutate the
 // live reachability indicator, or the stale outcome flickers on the new badge.
 func TestStaleProbeForOldProfileDoesNotOverwriteConnectedFlag(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -1271,126 +1137,45 @@ func TestStaleProbeForOldProfileDoesNotOverwriteConnectedFlag(t *testing.T) {
 
 	// Stale success probe for a profile other than the active one must not
 	// confirm "connected" on behalf of the live backend.
-	out, _ := m.handleProbe(probeMsg{profile: "hamrpass", contextWindow: 262144})
+	out, _ := m.handleProbe(probeMsg{profile: "remote"})
 	if !out.(Model).connected {
 		t.Fatal("stale success probe overwrote live connected=true")
 	}
 
 	// Stale failure probe must not flip the live backend to disconnected.
 	m.connected = true
-	out, _ = m.handleProbe(probeMsg{profile: "hamrpass", err: cloud.ErrUnauthorized, silent: true})
+	out, _ = m.handleProbe(probeMsg{profile: "remote", err: llm.ErrUnauthorized, silent: true})
 	if !out.(Model).connected {
 		t.Fatal("stale failure probe overwrote live connected=true")
 	}
 
 	// Sanity: a probe for the live profile with the live client DOES update.
-	out, _ = m.handleProbe(probeMsg{profile: "local", cli: m.cli, err: cloud.ErrUnauthorized, silent: true})
+	out, _ = m.handleProbe(probeMsg{profile: "local", cli: m.cli, err: llm.ErrUnauthorized, silent: true})
 	if out.(Model).connected {
 		t.Fatal("probe for the live profile must update connected")
 	}
 }
 
 // TestStaleProbeForSameProfileDoesNotOverwriteFreshOutcome: two probes for the
-// SAME profile can be in flight (startup probe + a re-activation); the profile
+// SAME profile can be in flight (startup probe + a reactivation); the profile
 // name alone can't tell them apart, so staleness is keyed on the client
-// pointer (rebuildClient swaps it per re-activation). A hung old probe's
+// pointer (rebuildClient swaps it per reactivation). A hung old probe's
 // failure landing after the fresh probe's success must neither flip connected
 // nor print a contradictory "⚠ probe" banner after the "✓ active" line.
 func TestStaleProbeForSameProfileDoesNotOverwriteFreshOutcome(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.cfg.Active = "local"
 	staleCli := m.cli
-	m.rebuildClient() // re-activation swapped the client; staleCli's probe is now superseded
+	m.rebuildClient() // reactivation swapped the client; staleCli's probe is now superseded
 	m.connected = true
 
-	out, _ := m.handleProbe(probeMsg{profile: "local", cli: staleCli, err: cloud.ErrUnauthorized})
+	out, _ := m.handleProbe(probeMsg{profile: "local", cli: staleCli, err: llm.ErrUnauthorized})
 	final := out.(Model)
 	if !final.connected {
 		t.Fatal("stale same-profile probe failure must not flip connected")
 	}
 	if got := stripANSI(final.scroll.String()); strings.Contains(got, "⚠ probe") {
 		t.Fatalf("stale same-profile probe must not print a failure banner:\n%s", got)
-	}
-}
-
-// TestProbeBudgetExhaustedUpdatesStatusBar: a 402 probe carries a
-// BudgetStatus{Set:true, Remaining:0} snapshot. handleProbe must apply it to
-// m.budget so the bar paints "0% pass" now, not after the first chat call 402s.
-func TestProbeBudgetExhaustedUpdatesStatusBar(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.Active = "hamrpass"
-	out, _ := m.handleProbe(probeMsg{
-		profile: "hamrpass",
-		cli:     m.cli,
-		budget:  cloud.BudgetStatus{Set: true, Remaining: 0},
-		silent:  true,
-		err:     cloud.ErrBudgetExhausted,
-	})
-	final := out.(Model)
-	if !final.budget.Set {
-		t.Fatal("402 probe must apply the depleted-budget snapshot to m.budget")
-	}
-	if final.budget.Remaining != 0 {
-		t.Fatalf("budget.Remaining = %v, want 0", final.budget.Remaining)
-	}
-}
-
-// TestProbeBudgetSnapshotIgnoredForStaleProfile: a budget snapshot from a
-// probe that lost the /models race (msg.profile != m.cfg.Active) must not
-// overwrite the live profile's m.budget. Mirrors the stale-probe guard the
-// connected flag already has.
-func TestProbeBudgetSnapshotIgnoredForStaleProfile(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.Active = "local"
-	m.budget = cloud.BudgetStatus{Set: true, Remaining: 0.88}
-	out, _ := m.handleProbe(probeMsg{
-		profile: "hamrpass",
-		budget:  cloud.BudgetStatus{Set: true, Remaining: 0},
-		silent:  true,
-		err:     cloud.ErrBudgetExhausted,
-	})
-	final := out.(Model)
-	if final.budget.Remaining != 0.88 {
-		t.Fatalf("stale probe overwrote live budget: %+v", final.budget)
-	}
-}
-
-// TestActiveContextSizePrefersLiveValue: packing reads liveContextSize first,
-// then Profile.ContextSize, then the floor. Cloud profiles ship ContextSize=0,
-// so without a live value the floor must apply.
-func TestActiveContextSizePrefersLiveValue(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.Active = "hamrpass" // ContextSize=0 by Bootstrap
-	if got := m.activeContextSize(); got != defaultPackFallback {
-		t.Fatalf("cloud profile with no live value should use floor %d, got %d",
-			defaultPackFallback, got)
-	}
-	m.liveContextSize["hamrpass"] = 262144
-	if got := m.activeContextSize(); got != 262144 {
-		t.Fatalf("live value must win, got %d", got)
-	}
-}
-
-// TestStatusBarShowsBudgetFromHeaders: the pass segment renders whenever
-// X-Budget-Remaining arrives: the header is the only signal, no profile gating.
-// The percent is rounded to a whole number so it doesn't jitter on every token.
-func TestStatusBarShowsBudgetFromHeaders(t *testing.T) {
-	view := runTurn(t, budgetResponseHandler, "sk-test", "hi").View()
-	if !strings.Contains(view, "73% pass") {
-		t.Fatalf("status bar missing pass segment: %s", view)
-	}
-}
-
-// TestStatusBarOmitsBudgetWithoutHeaders: endpoint sends no budget header,
-// no pass segment appears.
-func TestStatusBarOmitsBudgetWithoutHeaders(t *testing.T) {
-	view := runTurn(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		fmt.Fprint(w, "data: "+`{"type":"response.output_text.delta","delta":"ok"}`+"\n\n")
-		fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"response\":{}}\n\n")
-	}, "", "hi").View()
-	if strings.Contains(view, "pass") {
-		t.Fatalf("without headers the status bar must not show pass segment: %s", view)
 	}
 }
 
@@ -1410,7 +1195,7 @@ func TestViewHandlesZeroWidth(t *testing.T) {
 	}
 }
 
-// TestStatusBarShowsSpinnerWhenWaiting verifies the micro-animation text
+// TestStatusBarShowsSpinnerWhenWaiting verifies the micro animation text
 // appears in the bottom bar while a request is in flight, and disappears
 // when not.
 func TestStatusBarShowsSpinnerWhenWaiting(t *testing.T) {
@@ -1433,9 +1218,9 @@ func TestStatusBarShowsSpinnerWhenWaiting(t *testing.T) {
 }
 
 // TestBackendLabelReflectsConnectedState asserts the backend label renders
-// differently when connected vs not: the user's at-a-glance "are we
+// differently when connected vs not: the user's at a glance "are we
 // talking to a server?" signal. Disconnected appends a `!` marker so the
-// distinction survives on colour-stripped terminals.
+// distinction survives on colour stripped terminals.
 func TestBackendLabelReflectsConnectedState(t *testing.T) {
 	cfg, _, _ := config.Bootstrap(t.TempDir())
 	ok := backendLabel(cfg, true)
@@ -1457,7 +1242,7 @@ func TestErrorMessageUnreachable(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.cfg.ActiveProfile().URL = "http://localhost:11434"
 
-	msg := m.errorMessage(llm.Event{Err: cloud.ErrUnreachable{Err: fmt.Errorf("dial: refused")}})
+	msg := m.errorMessage(llm.Event{Err: llm.ErrUnreachable{Err: fmt.Errorf("dial: refused")}})
 	if !strings.Contains(msg, "unreachable") {
 		t.Fatalf("error must say 'unreachable': %q", msg)
 	}
@@ -1476,25 +1261,12 @@ func TestErrorMessageUnreachable(t *testing.T) {
 // config path so the user can fix it without guessing.
 func TestErrorMessageUnauthorized(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	msg := m.errorMessage(llm.Event{Err: cloud.ErrUnauthorized})
+	msg := m.errorMessage(llm.Event{Err: llm.ErrUnauthorized})
 	if !strings.Contains(msg, "key rejected") {
 		t.Fatalf("401 error should say 'key rejected': %q", msg)
 	}
 	if !strings.Contains(msg, "models."+m.cfg.Active+".key") {
 		t.Fatalf("401 error should name the active profile's key path: %q", msg)
-	}
-}
-
-// TestErrorMessageBudgetExhausted: 402 produces the depleted hint pointing
-// users at the top-up page rather than a stack-trace style wrap.
-func TestErrorMessageBudgetExhausted(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	msg := m.errorMessage(llm.Event{Err: cloud.ErrBudgetExhausted})
-	if !strings.Contains(msg, "depleted") {
-		t.Fatalf("402 error should mention 'depleted': %q", msg)
-	}
-	if !strings.Contains(msg, "codehamr.com") {
-		t.Fatalf("402 error should point at the top-up page: %q", msg)
 	}
 }
 
@@ -1521,7 +1293,7 @@ func TestCtrlLClearsPromptNotScrollback(t *testing.T) {
 }
 
 // TestCtrlLClosesPopover: Ctrl+L clears the popover along with the prompt.
-// Left open on stale suggestions, the next Enter would take the has-selection
+// Left open on stale suggestions, the next Enter would take the has selection
 // path and insert a ghost command into the freshly emptied prompt.
 func TestCtrlLClosesPopover(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -1542,10 +1314,10 @@ func TestCtrlLClosesPopover(t *testing.T) {
 	}
 }
 
-// TestAltEnterInsertsNewline: Alt+Enter composes a multi-line prompt. The
-// alt-flagged KeyEnter ("alt+enter") matches no textarea binding, so the flag
-// must be stripped before forwarding or the key is a silent no-op and
-// multi-line prompts can only be pasted.
+// TestAltEnterInsertsNewline: Alt+Enter composes a multi line prompt. The
+// alt flagged KeyEnter ("alt+enter") matches no textarea binding, so the flag
+// must be stripped before forwarding or the key is a silent no operation and
+// multi line prompts can only be pasted.
 func TestAltEnterInsertsNewline(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.ta.SetValue("first line")
@@ -1559,8 +1331,8 @@ func TestAltEnterInsertsNewline(t *testing.T) {
 	}
 }
 
-// TestHumanIntFormat: thin-comma formatting must handle the edge cases the
-// activation line cares about: single digits, exact 4-digit, exact powers,
+// TestHumanIntFormat: thin comma formatting must handle the edge cases the
+// activation line cares about: single digits, exact 4 digit, exact powers,
 // and very large windows that would otherwise read as a wall of digits.
 func TestHumanIntFormat(t *testing.T) {
 	cases := map[int]string{
@@ -1613,10 +1385,10 @@ func TestHumanTokensFormat(t *testing.T) {
 	}
 }
 
-// TestLiveElapsed: the running wall-clock readout, whole seconds under a
-// minute (no spinning sub-second decimal at the spinner's refresh rate), then
+// TestLiveElapsed: the running wall clock readout, whole seconds under a
+// minute (no spinning sub second decimal at the spinner's refresh rate), then
 // `6m 51s` / `1h 14m`, with the lower unit always two digits and never
-// dropped (`8m 00s`, not `8m`), so the readout never shrinks mid-turn.
+// dropped (`8m 00s`, not `8m`), so the readout never shrinks mid turn.
 func TestLiveElapsed(t *testing.T) {
 	cases := []struct {
 		d    time.Duration
@@ -1645,7 +1417,7 @@ func TestLiveElapsed(t *testing.T) {
 }
 
 // TestHumanRateFormat: throughput as `N tok/s`. Degenerate inputs (zero tokens
-// or zero elapsed) collapse to "" so the banner omits the segment. Sub-10 tok/s
+// or zero elapsed) collapse to "" so the banner omits the segment. Sub 10 tok/s
 // keeps one decimal: reasoning models hover near 1 tok/s where it's the signal.
 func TestHumanRateFormat(t *testing.T) {
 	cases := []struct {
@@ -1671,12 +1443,12 @@ func TestHumanRateFormat(t *testing.T) {
 }
 
 // TestSessionTokensAccumulateAcrossTurns: the session counter is separate
-// from the per-turn counter. finalizeTurn resets turnTokens; sessionTokens
+// from the per turn counter. finalizeTurn resets turnTokens; sessionTokens
 // keeps growing for the rest of the session.
 func TestSessionTokensAccumulateAcrossTurns(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	// Simulate three Done events. phase must be active or handleStream will
-	// (correctly) drop events as stale post-cancel buffer: EventDone does
+	// (correctly) drop events as stale post cancel buffer: EventDone does
 	// not move phase, so we seed streaming once and let each Done carry
 	// through.
 	m.phase = phaseStreaming
@@ -1696,7 +1468,7 @@ func TestSessionTokensAccumulateAcrossTurns(t *testing.T) {
 }
 
 // TestSessionTokensSurviveFinalizeTurn: finalizeTurn clears turnTokens but
-// must NOT touch sessionTokens. turnStart must be set or finalizeTurn no-ops.
+// must NOT touch sessionTokens. turnStart must be set or finalizeTurn no operations.
 func TestSessionTokensSurviveFinalizeTurn(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.turnTokens = 50
@@ -1714,16 +1486,16 @@ func TestSessionTokensSurviveFinalizeTurn(t *testing.T) {
 	}
 }
 
-// TestFinalizeFoldsInFlightEstimate: a turn aborted mid-stream (Ctrl+C, error)
+// TestFinalizeFoldsInFlightEstimate: a turn aborted mid stream (Ctrl+C, error)
 // has no EventDone to fold the current round's tokens into turnTokens; they sit
 // in streamingEstimate. finalizeTurn must commit that estimate so the frozen avg
 // counts what was generated up to the interrupt and the session total doesn't
-// drop backward. (On a clean finish the estimate is already 0, so this is a no-op.)
+// drop backward. (On a clean finish the estimate is already 0, so this is a no operation.)
 func TestFinalizeFoldsInFlightEstimate(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.turnStart = time.Now()
 	m.turnTokens = 40        // one completed round
-	m.streamingEstimate = 60 // an in-flight round cancelled before EventDone
+	m.streamingEstimate = 60 // an in flight round cancelled before EventDone
 	m.sessionTokens = 200
 	m.finalizeTurn(outcomeStopped)
 	if m.lastTokens != 100 {
@@ -1740,7 +1512,7 @@ func TestFinalizeFoldsInFlightEstimate(t *testing.T) {
 	}
 }
 
-// TestToolTargetKey pins the identity the repeated-failure nudge keys on: file
+// TestToolTargetKey pins the identity the repeated failure nudge keys on: file
 // tools key on tool+path, bash on tool + the trimmed first command line, else
 // the bare tool name. Deliberately NOT the full args: a cosmetic retry change
 // (regenerated body, reworded tail) must not reset the streak.
@@ -1791,7 +1563,7 @@ func TestToolResultFailed(t *testing.T) {
 	}{
 		{"cancelled is never a failure", tools.BashName, "partial\n(cancelled)", false},
 		{"cancelled file op is not a failure", tools.WriteFileName, "(cancelled)", false},
-		{"bash non-zero exit fails", tools.BashName, "boom\n(exit: exit status 1)", true},
+		{"bash nonzero exit fails", tools.BashName, "boom\n(exit: exit status 1)", true},
 		{"bash timeout fails", tools.BashName, "slow\n(timeout after 2s)", true},
 		{"bash empty-command fails", tools.BashName, "(empty command)", true},
 		{"bash clean success", tools.BashName, "all green\n", false},
@@ -1805,8 +1577,8 @@ func TestToolResultFailed(t *testing.T) {
 		{"read_file success", tools.ReadFileName, "package main\n", false},
 		{"read_file Lisp content is not a failure", tools.ReadFileName, "(ns foo)\n(defn bar [] 1)\n", false},
 		{"read_file leading-paren prose is not a failure", tools.ReadFileName, "(this file starts with a paren)", false},
-		// Router-level failures bypass the per-tool shapes and must still feed
-		// the streak: truncated args re-emitted forever was exactly the loop
+		// Router level failures bypass the per tool shapes and must still feed
+		// the streak: truncated args reemitted forever was exactly the loop
 		// the failure nudge was built for.
 		{"invalid-JSON args fail for bash", tools.BashName, "(tool arguments were not valid JSON: unexpected end of JSON input, most likely the arguments were truncated)", true},
 		{"invalid-JSON args fail for read_file", tools.ReadFileName, "(tool arguments were not valid JSON: x)", true},
@@ -1821,7 +1593,7 @@ func TestToolResultFailed(t *testing.T) {
 }
 
 // TestRepeatedFailureNudgeFiresOnceAfterFiveSameTargetFailures drives the
-// repeated-failure backstop end-to-end. Five consecutive failures of the SAME
+// repeated failure backstop end to end. Five consecutive failures of the SAME
 // target append exactly one RoleSystem nudge and reset the streak; the nudge
 // text reports the count.
 func TestRepeatedFailureNudgeFiresOnceAfterFiveSameTargetFailures(t *testing.T) {
@@ -1855,13 +1627,13 @@ func TestRepeatedFailureNudgeFiresOnceAfterFiveSameTargetFailures(t *testing.T) 
 		}
 	}
 	if nudges != 1 {
-		t.Fatalf("expected exactly one RoleSystem nudge after %d same-target failures, got %d:\n%+v",
+		t.Fatalf("expected exactly one RoleSystem nudge after %d same target failures, got %d:\n%+v",
 			maxToolFailStreak, nudges, final.history)
 	}
 	if !strings.Contains(last.Content, fmt.Sprintf("last %d tool calls", maxToolFailStreak)) {
 		t.Fatalf("nudge should name the streak count: %q", last.Content)
 	}
-	// Streak resets after firing so it can't double-fire on the next failure.
+	// Streak resets after firing so it can't double fire on the next failure.
 	if final.failStreak != 0 || final.failKey != "" {
 		t.Fatalf("nudge must reset failKey/failStreak, got key=%q streak=%d", final.failKey, final.failStreak)
 	}
@@ -1934,7 +1706,7 @@ func TestRepeatedFailureNudgeDifferentTargetResetsStreak(t *testing.T) {
 
 // TestSubmitResetsFailureStreak: a fresh user submission is a new goal, so a
 // stale streak from the previous goal must not carry over and trip the nudge
-// early. submit's non-slash path zeroes failKey/failStreak.
+// early. submit's non slash path zeroes failKey/failStreak.
 func TestSubmitResetsFailureStreak(t *testing.T) {
 	m := newTestModel(t, func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, "data: "+`{"type":"response.output_text.delta","delta":"ok"}`+"\n\n")
@@ -1951,7 +1723,7 @@ func TestSubmitResetsFailureStreak(t *testing.T) {
 }
 
 // TestClearResetsFailureStreak: /clear starts the conversation over, including
-// the repeated-failure backstop's counters.
+// the repeated failure backstop's counters.
 func TestClearResetsFailureStreak(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.failKey = tools.BashName + "|make build"
@@ -1975,9 +1747,9 @@ func countSystem(history []chmctx.Message) int {
 	return n
 }
 
-// TestRunawayNudgeFiresAtMaxLLMRounds: the per-turn round-trip counter trips
+// TestRunawayNudgeFiresAtMaxLLMRounds: the per turn round trip counter trips
 // one soft system note when it reaches maxLLMRounds, and not before. Counted in
-// round-trips, not tool calls: batching inflates the call count, so a call-based
+// round trips, not tool calls: batching inflates the call count, so a call based
 // cap would fire on a healthy turn that batched its reads.
 func TestRunawayNudgeFiresAtMaxLLMRounds(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -1994,7 +1766,7 @@ func TestRunawayNudgeFiresAtMaxLLMRounds(t *testing.T) {
 		t.Fatalf("at the cap expected one system nudge, got %d:\n%+v", n, m.history)
 	}
 	last := m.history[len(m.history)-1]
-	if !strings.Contains(last.Content, fmt.Sprintf("%d round-trips", maxLLMRounds)) {
+	if !strings.Contains(last.Content, fmt.Sprintf("%d round trips", maxLLMRounds)) {
 		t.Fatalf("runaway nudge should name the count: %q", last.Content)
 	}
 
@@ -2007,13 +1779,13 @@ func TestRunawayNudgeFiresAtMaxLLMRounds(t *testing.T) {
 }
 
 // TestRunawayNudgeRefiresPeriodically: past the cap the check must keep firing
-// every runawayNudgeInterval rounds. Under the old once-per-turn latch a turn
+// every runawayNudgeInterval rounds. Under the old once per turn latch a turn
 // that sailed past the cap ran completely unsupervised for the rest of its life,
 // which is exactly the runaway the nudge exists to catch.
 func TestRunawayNudgeRefiresPeriodically(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 
-	// Overshoot the cap without ever landing on it (the multi-call jump).
+	// Overshoot the cap without ever landing on it (the multi call jump).
 	m.llmRounds = maxLLMRounds + 3
 	m.maybeRunawayNudge()
 	if n := countSystem(m.history); n != 1 {
@@ -2026,7 +1798,7 @@ func TestRunawayNudgeRefiresPeriodically(t *testing.T) {
 	}
 }
 
-// TestEndTurnResetsToolRounds: the runaway counter is per-turn, so endTurn must
+// TestEndTurnResetsToolRounds: the runaway counter is per turn, so endTurn must
 // zero it or the next turn inherits a head start toward the cap.
 func TestEndTurnResetsToolRounds(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -2038,7 +1810,7 @@ func TestEndTurnResetsToolRounds(t *testing.T) {
 	}
 }
 
-// TestVerifyNudgeFiresOnceAtMinRounds: the finish re-grounding nudge trips one
+// TestVerifyNudgeFiresOnceAtMinRounds: the finish re grounding nudge trips one
 // soft system note only once a turn has done real work (llmRounds >=
 // verifyNudgeMinRounds, or toolRounds >= verifyNudgeMinCalls), and never below
 // it; the latch keeps it to once per turn.
@@ -2061,26 +1833,26 @@ func TestVerifyNudgeFiresOnceAtMinRounds(t *testing.T) {
 		t.Fatal("at the min-rounds gate the nudge must fire and report it nudged")
 	}
 	if n := countSystem(m.history); n != 1 {
-		t.Fatalf("at the gate expected one re-grounding note, got %d:\n%+v", n, m.history)
+		t.Fatalf("at the gate expected one re grounding note, got %d:\n%+v", n, m.history)
 	}
 	last := m.history[len(m.history)-1]
 	if !strings.Contains(last.Content, "unverified") || !strings.Contains(last.Content, "original request") {
-		t.Fatalf("re-grounding note must push honest verification against the original request: %q", last.Content)
+		t.Fatalf("re grounding note must push honest verification against the original request: %q", last.Content)
 	}
-	// The note is re-sent as context on every remaining round of the turn, and
-	// it competes for attention with the actual task. The old 1240-char version
-	// carried a whole install-probe runbook that duplicated the system prompt;
-	// that guidance belongs in the always-on prompt, not stapled to a finish.
+	// The note is re sent as context on every remaining round of the turn, and
+	// it competes for attention with the actual task. The old 1240 char version
+	// carried a whole install probe runbook that duplicated the system prompt;
+	// that guidance belongs in the always on prompt, not stapled to a finish.
 	// Pin the budget so it can't grow back.
 	if len(last.Content) > 700 {
-		t.Fatalf("re-grounding note has grown back to %d chars; keep it a principle, not a runbook: %q", len(last.Content), last.Content)
+		t.Fatalf("re grounding note has grown back to %d chars; keep it a principle, not a runbook: %q", len(last.Content), last.Content)
 	}
 
-	// Latched: a later drain in the same turn must not re-fire.
+	// Latched: a later drain in the same turn must not re fire.
 	m.toolRounds = verifyNudgeMinRounds + 50
 	m.llmRounds = verifyNudgeMinRounds + 50
 	if m.maybeVerifyNudge() {
-		t.Fatal("latch must prevent a second re-grounding nudge in the same turn")
+		t.Fatal("latch must prevent a second re grounding nudge in the same turn")
 	}
 	if n := countSystem(m.history); n != 1 {
 		t.Fatalf("latch must hold at one note, got %d", n)
@@ -2088,27 +1860,27 @@ func TestVerifyNudgeFiresOnceAtMinRounds(t *testing.T) {
 }
 
 // TestVerifyNudgeFiresOnBatchedCalls: the batching instruction compresses a
-// substantial build-and-claim turn below verifyNudgeMinRounds round-trips
-// (five rounds of three calls each is real work with a real false-green
-// risk), so the call-count gate must trip the nudge on its own. Guards the
+// substantial build and claim turn below verifyNudgeMinRounds round trips
+// (five rounds of three calls each is real work with a real false green
+// risk), so the call count gate must trip the nudge on its own. Guards the
 // hole where the prompt's biggest lever silently disabled the fourth backstop.
 func TestVerifyNudgeFiresOnBatchedCalls(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.llmRounds = verifyNudgeMinRounds - 3 // few round-trips...
+	m.llmRounds = verifyNudgeMinRounds - 3 // few round trips...
 	m.toolRounds = verifyNudgeMinCalls     // ...but many batched calls
 	m.turnActed = true
 	if !m.maybeVerifyNudge() {
 		t.Fatal("a heavily-batched substantial turn must still be re-grounded")
 	}
 	if n := countSystem(m.history); n != 1 {
-		t.Fatalf("expected one re-grounding note, got %d", n)
+		t.Fatalf("expected one re grounding note, got %d", n)
 	}
 }
 
 // TestVerifyNudgeRePromptsSubstantialCleanFinish: a substantial turn ending with a
-// clean, non-empty summary must be re-prompted once (phase back to thinking, a
-// chat cmd returned, the re-grounding note appended) rather than finalized, so
-// the model verifies before handing back. This is the false-green-finish guard.
+// clean, nonempty summary must be reprompted once (phase back to thinking, a
+// chat cmd returned, the re grounding note appended) rather than finalized, so
+// the model verifies before handing back. This is the false green finish guard.
 func TestVerifyNudgeRePromptsSubstantialCleanFinish(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.installTurnContext()
@@ -2118,27 +1890,27 @@ func TestVerifyNudgeRePromptsSubstantialCleanFinish(t *testing.T) {
 	m.turnActed = true
 	m.history = []chmctx.Message{
 		{Role: chmctx.RoleUser, Content: "build galaxy.html"},
-		{Role: chmctx.RoleAssistant, Content: "Done - built galaxy.html with all features."},
+		{Role: chmctx.RoleAssistant, Content: "Done: built galaxy.html with all features."},
 	}
 	out, cmd := m.handleStreamClosed()
 	mm := out.(Model)
 	if cmd == nil {
-		t.Fatal("a substantial clean finish must re-prompt (non-nil chat cmd)")
+		t.Fatal("a substantial clean finish must reprompt (non-nil chat cmd)")
 	}
 	if mm.phase != phaseThinking {
-		t.Fatalf("re-prompt must leave phase thinking, got %v", mm.phase)
+		t.Fatalf("reprompt must leave phase thinking, got %v", mm.phase)
 	}
 	if !mm.verifyNudged {
-		t.Fatal("verifyNudged must latch after the re-grounding nudge fires")
+		t.Fatal("verifyNudged must latch after the re grounding nudge fires")
 	}
 	if n := countSystem(mm.history); n != 1 {
-		t.Fatalf("expected exactly one re-grounding system note, got %d:\n%+v", n, mm.history)
+		t.Fatalf("expected exactly one re grounding system note, got %d:\n%+v", n, mm.history)
 	}
 }
 
 // TestVerifyNudgeSkipsTrivialTurn: a turn that did little work (toolRounds below
-// the gate) must finish normally (finalized, no re-prompt, no system note) so
-// quick answers and one-line edits aren't nagged.
+// the gate) must finish normally (finalized, no reprompt, no system note) so
+// quick answers and one line edits aren't nagged.
 func TestVerifyNudgeSkipsTrivialTurn(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.installTurnContext()
@@ -2152,7 +1924,7 @@ func TestVerifyNudgeSkipsTrivialTurn(t *testing.T) {
 	out, cmd := m.handleStreamClosed()
 	mm := out.(Model)
 	if cmd != nil {
-		t.Fatal("a trivial turn must finish, not re-prompt")
+		t.Fatal("a trivial turn must finish, not reprompt")
 	}
 	if mm.phase != phaseIdle {
 		t.Fatalf("a finished turn must be idle, got %v", mm.phase)
@@ -2163,8 +1935,8 @@ func TestVerifyNudgeSkipsTrivialTurn(t *testing.T) {
 }
 
 // TestVerifyNudgeYieldsToEmptyReply: an empty newest assistant message is the
-// empty-reply nudge's domain even on a substantial turn: the verify nudge must
-// not pre-empt it (its note re-grounds a summary that doesn't exist).
+// empty reply nudge's domain even on a substantial turn: the verify nudge must
+// not pre empt it (its note re grounds a summary that doesn't exist).
 func TestVerifyNudgeYieldsToEmptyReply(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.installTurnContext()
@@ -2173,24 +1945,24 @@ func TestVerifyNudgeYieldsToEmptyReply(t *testing.T) {
 	m.llmRounds = verifyNudgeMinRounds + 10
 	m.history = []chmctx.Message{
 		{Role: chmctx.RoleUser, Content: "build it"},
-		{Role: chmctx.RoleAssistant, Content: ""}, // empty: stopped mid-task
+		{Role: chmctx.RoleAssistant, Content: ""}, // empty: stopped mid task
 	}
 	out, _ := m.handleStreamClosed()
 	mm := out.(Model)
 	if mm.verifyNudged {
-		t.Fatal("an empty reply belongs to the empty-reply nudge; verify nudge must not fire")
+		t.Fatal("an empty reply belongs to the empty reply nudge; verify nudge must not fire")
 	}
 	last := mm.history[len(mm.history)-1]
 	if last.Role != chmctx.RoleSystem || !strings.Contains(last.Content, "no reply and no tool call") {
-		t.Fatalf("expected the empty-reply nudge to own this finish, got %+v", last)
+		t.Fatalf("expected the empty reply nudge to own this finish, got %+v", last)
 	}
 }
 
 // TestVerifyNudgeSkipsHonestUnverifiedFinish: a substantial turn whose summary
-// already marks something `unverified` has done the honest self-assessment the
+// already marks something `unverified` has done the honest self assessment the
 // nudge exists to elicit (it is the OPPOSITE of a false green) so it must
-// finish without a re-prompt. Guards the round-5 regression where re-prompting an
-// honest "unverified: browser runtime" finish produced a confident, caveat-free
+// finish without a reprompt. Guards the round 5 regression where reprompting an
+// honest "unverified: browser runtime" finish produced a confident, caveat free
 // "it works" on the next round.
 func TestVerifyNudgeSkipsHonestUnverifiedFinish(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -2200,7 +1972,7 @@ func TestVerifyNudgeSkipsHonestUnverifiedFinish(t *testing.T) {
 	m.llmRounds = verifyNudgeMinRounds + 20
 	m.history = []chmctx.Message{
 		{Role: chmctx.RoleUser, Content: "build galaxy.html"},
-		{Role: chmctx.RoleAssistant, Content: "Built galaxy.html. unverified: browser runtime - no browser in this sandbox to load it."},
+		{Role: chmctx.RoleAssistant, Content: "Built galaxy.html. unverified: browser runtime: no browser in this sandbox to load it."},
 	}
 	out, cmd := m.handleStreamClosed()
 	mm := out.(Model)
@@ -2220,8 +1992,8 @@ func TestVerifyNudgeSkipsHonestUnverifiedFinish(t *testing.T) {
 
 // TestVerifyNudgeEndToEndRePromptsThenFinishes drives a full turn that does real
 // work (8 bash rounds) then "finishes" with a confident summary. The finish
-// re-grounding nudge must inject one note and re-prompt exactly once, and the
-// turn must then complete idle: the false-green-finish path, end to end.
+// re grounding nudge must inject one note and reprompt exactly once, and the
+// turn must then complete idle: the false green finish path, end to end.
 func TestVerifyNudgeEndToEndRePromptsThenFinishes(t *testing.T) {
 	var round int
 	handler := func(w http.ResponseWriter, _ *http.Request) {
@@ -2234,16 +2006,16 @@ func TestVerifyNudgeEndToEndRePromptsThenFinishes(t *testing.T) {
 			return
 		}
 		// A confident, toolless summary, what the galaxy runs shipped.
-		fmt.Fprint(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Done - galaxy.html built with all features.\"}\n\n")
+		fmt.Fprint(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Done: galaxy.html built with all features.\"}\n\n")
 		fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"output_tokens\":6}}}\n\n")
 	}
 
 	m := newTestModel(t, handler)
 	final := drainFinal(t, m, "build galaxy.html")
 
-	// 8 tool rounds + a summary that gets re-prompted + the final summary = 10.
+	// 8 tool rounds + a summary that gets reprompted + the final summary = 10.
 	if round != verifyNudgeMinRounds+2 {
-		t.Fatalf("substantial finish must re-prompt exactly once (want %d requests, got %d)", verifyNudgeMinRounds+2, round)
+		t.Fatalf("substantial finish must reprompt exactly once (want %d requests, got %d)", verifyNudgeMinRounds+2, round)
 	}
 	var nudges int
 	for _, msg := range final.history {
@@ -2252,15 +2024,15 @@ func TestVerifyNudgeEndToEndRePromptsThenFinishes(t *testing.T) {
 		}
 	}
 	if nudges != 1 {
-		t.Fatalf("expected exactly one finish re-grounding note in history, got %d", nudges)
+		t.Fatalf("expected exactly one finish re grounding note in history, got %d", nudges)
 	}
 	if final.phase != phaseIdle {
 		t.Fatalf("turn must end idle after the re-grounded finish, phase=%v", final.phase)
 	}
 }
 
-// TestEndTurnResetsVerifyNudged: the latch is per-turn, so endTurn must clear it
-// or a later turn never re-grounds.
+// TestEndTurnResetsVerifyNudged: the latch is per turn, so endTurn must clear it
+// or a later turn never re grounds.
 func TestEndTurnResetsVerifyNudged(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.installTurnContext()
@@ -2272,14 +2044,14 @@ func TestEndTurnResetsVerifyNudged(t *testing.T) {
 }
 
 // TestToolCallLeakWarningDetectsStrandedXML: a turn ending with leaked
-// tool-call XML stranded in the newest assistant message warns the user; clean
+// tool call XML stranded in the newest assistant message warns the user; clean
 // text doesn't, and only the NEWEST assistant message is inspected.
 func TestToolCallLeakWarningDetectsStrandedXML(t *testing.T) {
-	// XML tool-call body.
+	// XML tool call body.
 	coderLeak := "Let me search.\n<tool_call>\n<function=bash>\n<parameter=cmd>ls</parameter>\n</function>\n</tool_call>"
-	// General JSON tool-call body, the target model class, NO `<function=`.
+	// General JSON tool call body, the target model class, NO `<function=`.
 	denseLeak := "Let me search.\n<tool_call>\n{\"name\": \"bash\", \"arguments\": {\"cmd\": \"ls\"}}\n</tool_call>"
-	clean := "Done - built and tested, all green."
+	clean := "Done: built and tested, all green."
 
 	for name, leak := range map[string]string{"coder-xml": coderLeak, "dense-json": denseLeak} {
 		if w := toolCallLeakWarning([]chmctx.Message{{Role: chmctx.RoleAssistant, Content: leak}}); w == "" {
@@ -2311,7 +2083,7 @@ func TestToolCallLeakWarningDetectsStrandedXML(t *testing.T) {
 	}
 }
 
-// TestStatusBarShowsSessionTokens: once the counter is non-zero it appears
+// TestStatusBarShowsSessionTokens: once the counter is nonzero it appears
 // in the status bar; at zero the bar stays quiet.
 func TestStatusBarShowsSessionTokens(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -2326,8 +2098,8 @@ func TestStatusBarShowsSessionTokens(t *testing.T) {
 }
 
 // TestStatusBarLiveTimerAndFrozenSummary: during an active turn the bar shows
-// the phase label plus a ticking wall-clock; at idle after a clean finish it
-// shows the frozen ✓, the wall-clock duration, and the avg rate that divides
+// the phase label plus a ticking wall clock; at idle after a clean finish it
+// shows the frozen ✓, the wall clock duration, and the avg rate that divides
 // into it (5000 tok ÷ 100s = 50 tok/s).
 func TestStatusBarLiveTimerAndFrozenSummary(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -2368,8 +2140,8 @@ func TestClearResetsSessionTokens(t *testing.T) {
 }
 
 // TestWrapRowsMatchesBubblesBehaviour: wrapRows must match the row count of
-// bubbles/textarea's internal wrap(): word-boundary aware, hard-wrap fallback
-// for over-wide single words, and a trailing cursor-anchor row when content
+// bubbles/textarea's internal wrap(): word boundary aware, hard wrap fallback
+// for over wide single words, and a trailing cursor anchor row when content
 // exactly fills the width.
 func TestWrapRowsMatchesBubblesBehaviour(t *testing.T) {
 	cases := []struct {
@@ -2414,7 +2186,7 @@ func TestVisualPromptLinesSumsAcrossLogicalLines(t *testing.T) {
 
 // TestPromptGrowsOnWrappedLongLine: a long paragraph typed without Enter has
 // LineCount()==1, so relying on it sticks the textarea at 1 row while text wraps
-// off-screen. recomputeLayout must count *visual* rows.
+// off screen. recomputeLayout must count *visual* rows.
 func TestPromptGrowsOnWrappedLongLine(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	// newTestModel sets width=100 → effective text width ~96. 300 runes of
@@ -2427,7 +2199,7 @@ func TestPromptGrowsOnWrappedLongLine(t *testing.T) {
 }
 
 // TestPromptAutoGrowsWithContent: the textarea starts at 1 line, grows with
-// newlines, and clamps to height - minViewport - 2 - popover, so big pastes use
+// newlines, and clamps to height: minViewport: 2: popover, so big pastes use
 // most of the screen while chat keeps its floor.
 func TestPromptAutoGrowsWithContent(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -2442,17 +2214,17 @@ func TestPromptAutoGrowsWithContent(t *testing.T) {
 	}
 
 	// Far past the cap, height must clamp to leave room for chat. With
-	// newTestModel's 30-row terminal, cap = 30 - 5 - 2 - 0 = 23.
+	// newTestModel's 30 row terminal, cap = 30: 5: 2: 0 = 23.
 	m.ta.SetValue(strings.Repeat("x\n", 40) + "end")
 	m.recomputeLayout()
 	want := m.height - minViewport - 2
 	if got := m.ta.Height(); got != want {
-		t.Fatalf("height should clamp to %d (h=%d - minViewport=%d - chrome=2), got %d",
+		t.Fatalf("height should clamp to %d (h=%d: minViewport=%d: chrome=2), got %d",
 			want, m.height, minViewport, got)
 	}
 }
 
-// TestPromptShrinksAfterSubmit: after Enter submits a multi-line prompt the
+// TestPromptShrinksAfterSubmit: after Enter submits a multi line prompt the
 // textarea resets to empty and the height snaps back to 1 line.
 func TestPromptShrinksAfterSubmit(t *testing.T) {
 	m := newTestModel(t, func(w http.ResponseWriter, _ *http.Request) {
@@ -2474,7 +2246,7 @@ func TestPromptShrinksAfterSubmit(t *testing.T) {
 }
 
 // stripANSI removes CSI escape sequences (`\x1b[…m`) so tests can match the
-// visible text through glamour's per-word styling, which splits "foo bar" into
+// visible text through glamour's per word styling, which splits "foo bar" into
 // `<span>foo</span> <span>bar</span>` and breaks a naive Contains("foo bar").
 func stripANSI(s string) string {
 	var b strings.Builder
@@ -2493,7 +2265,7 @@ func stripANSI(s string) string {
 	return b.String()
 }
 
-// TestStreamContentShowsLiveInViewport: a mid-turn content event populates the
+// TestStreamContentShowsLiveInViewport: a mid turn content event populates the
 // streaming buffer, promotes phase thinking→streaming, and is visible in View()
 // before any EventDone: the "tokens stream immediately" promise.
 func TestStreamContentShowsLiveInViewport(t *testing.T) {
@@ -2533,9 +2305,9 @@ func TestEventDoneFlushesStreamingThroughGlamour(t *testing.T) {
 	}
 }
 
-// TestToolCallFlushesStreamedContent: a tool-call event ends the content phase.
+// TestToolCallFlushesStreamedContent: a tool call event ends the content phase.
 // Whatever streamed before it is rendered and committed *now*, so the user sees
-// styled text *before* the inline tool-call status, not all at once at turn end.
+// styled text *before* the inline tool call status, not all at once at turn end.
 func TestToolCallFlushesStreamedContent(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.phase = phaseStreaming
@@ -2544,13 +2316,13 @@ func TestToolCallFlushesStreamedContent(t *testing.T) {
 	out, _ := m.handleStream(llm.Event{Kind: llm.EventToolCall, ToolCall: &call})
 	om := out.(Model)
 	if om.streaming.Len() != 0 {
-		t.Fatal("tool-call must flush streaming buffer into scroll")
+		t.Fatal("tool call must flush streaming buffer into scroll")
 	}
 	if !strings.Contains(stripANSI(om.scroll.String()), "I'll run bash") {
-		t.Fatalf("content should be committed to scroll before tool-call: %q", om.scroll.String())
+		t.Fatalf("content should be committed to scroll before tool call: %q", om.scroll.String())
 	}
 	if len(om.pending) != 1 || om.pending[0].Name != "bash" {
-		t.Fatalf("tool-call should land in pending: %+v", om.pending)
+		t.Fatalf("tool call should land in pending: %+v", om.pending)
 	}
 }
 
@@ -2583,12 +2355,12 @@ func TestCancelMidStreamPreservesStreamedText(t *testing.T) {
 }
 
 // TestHandleStreamDrainsAfterCancel: buffered stream events can arrive after
-// Ctrl+C returned phase to idle. Processing them would write ghost tokens, re-
+// Ctrl+C returned phase to idle. Processing them would write ghost tokens, re
 // populate m.pending, and credit a cancelled turn's usage to sessionTokens.
-// handleStream must drain-only.
+// handleStream must drain only.
 func TestHandleStreamDrainsAfterCancel(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.phase = phaseIdle // post-cancel state
+	m.phase = phaseIdle // post cancel state
 	m.sessionTokens = 100
 
 	out, _ := m.handleStream(llm.Event{Kind: llm.EventContent, Content: "ghost"})
@@ -2609,7 +2381,7 @@ func TestHandleStreamDrainsAfterCancel(t *testing.T) {
 }
 
 // TestHandleStreamClosedSkipsAdvanceAfterCancel: after Ctrl+C leaves phase=idle,
-// the deferred streamClosedMsg must not auto-restart a turn (the agent re-
+// the deferred streamClosedMsg must not auto restart a turn (the agent re
 // entering chat after a stop would surprise the user). No history mutation.
 func TestHandleStreamClosedSkipsAdvanceAfterCancel(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -2670,10 +2442,10 @@ func TestStaleStreamCloseDoesNotKillLiveTurn(t *testing.T) {
 	out, _ := m.Update(streamClosedMsg{ch: stale})
 	om := out.(Model)
 	if om.stream != live {
-		t.Fatal("stale close must not overwrite m.stream - live read loop would die")
+		t.Fatal("stale close must not overwrite m.stream: live read loop would die")
 	}
 	if !om.phase.active() {
-		t.Fatalf("stale close finalised the live turn - phase is now %v", om.phase)
+		t.Fatalf("stale close finalised the live turn: phase is now %v", om.phase)
 	}
 	if om.cancel == nil {
 		t.Fatal("stale close cancelled the live turn's context")
@@ -2697,7 +2469,7 @@ func TestStaleToolResultDoesNotEnterLiveHistory(t *testing.T) {
 	beforeLen := len(m.history)
 	beforeStream := m.stream
 
-	// Stale toolResultMsg carrying turn N's (already-cancelled) ctx.
+	// Stale toolResultMsg carrying turn N's (already cancelled) ctx.
 	ctxStale, cancelStale := context.WithCancel(context.Background())
 	cancelStale()
 	stale := toolResultMsg{
@@ -2710,7 +2482,7 @@ func TestStaleToolResultDoesNotEnterLiveHistory(t *testing.T) {
 		t.Fatalf("stale tool result entered live history: %+v", om.history)
 	}
 	if om.stream != beforeStream {
-		t.Fatal("stale tool result triggered a fresh startChat - live stream replaced")
+		t.Fatal("stale tool result triggered a fresh startChat: live stream replaced")
 	}
 	if cmd != nil {
 		t.Fatalf("stale tool result returned a Cmd; should be no-op: %T", cmd)
@@ -2719,7 +2491,7 @@ func TestStaleToolResultDoesNotEnterLiveHistory(t *testing.T) {
 
 // TestRunToolCallHonorsBashTimeoutBeyondLegacyCap: bash's own timeout is the only
 // ceiling: runToolCall must not wrap the parent context in a shorter cap. Runs a
-// fast `echo` with a 1800s tool-arg timeout and asserts it completes normally.
+// fast `echo` with a 1800s tool arg timeout and asserts it completes normally.
 func TestRunToolCallHonorsBashTimeoutBeyondLegacyCap(t *testing.T) {
 	parent := context.Background() // no outer deadline
 	cmd := runToolCall(parent, chmctx.ToolCall{
@@ -2727,7 +2499,7 @@ func TestRunToolCallHonorsBashTimeoutBeyondLegacyCap(t *testing.T) {
 		Name: "bash",
 		Arguments: map[string]any{
 			"cmd":             "echo through-the-cap",
-			"timeout_seconds": float64(1800), // 10× the old 3-min ceiling
+			"timeout_seconds": float64(1800), // 10× the old 3 min ceiling
 		},
 	})
 	start := time.Now()
@@ -2739,19 +2511,19 @@ func TestRunToolCallHonorsBashTimeoutBeyondLegacyCap(t *testing.T) {
 		t.Fatalf("expected toolResultMsg, got %T", msg)
 	}
 	if !strings.Contains(result.Msg.Content, "through-the-cap") {
-		t.Fatalf("bash output missing - call may have been killed: %q", result.Msg.Content)
+		t.Fatalf("bash output missing: call may have been killed: %q", result.Msg.Content)
 	}
 	if strings.Contains(result.Msg.Content, "timeout") || strings.Contains(result.Msg.Content, "cancelled") {
 		t.Fatalf("bash should not have been timed-out or cancelled: %q", result.Msg.Content)
 	}
 	// Sanity: a fast echo finishes in ms, not minutes, a canary for runToolCall
-	// re-introducing a blocking outer wrapper.
+	// re introducing a blocking outer wrapper.
 	if elapsed > 10*time.Second {
-		t.Fatalf("bash took %s - runToolCall is doing more than passing through", elapsed)
+		t.Fatalf("bash took %s: runToolCall is doing more than passing through", elapsed)
 	}
 }
 
-// TestEventErrorPreservesStreamedText: a stream error mid-content flushes the
+// TestEventErrorPreservesStreamedText: a stream error mid content flushes the
 // partial text before appending the error line, same principle as cancel,
 // user keeps the context they were reading.
 func TestEventErrorPreservesStreamedText(t *testing.T) {
@@ -2775,7 +2547,7 @@ func TestEventErrorPreservesStreamedText(t *testing.T) {
 }
 
 // drain advances the model until no async commands remain, a synchronous
-// bubbletea mini-runtime. tea.BatchMsg arrives when Update wraps multiple Cmds
+// bubbletea mini runtime. tea.BatchMsg arrives when Update wraps multiple Cmds
 // (e.g. tea.Println from the outbox + the handler's own Cmd); each child runs,
 // its result feeds back through Update, and any new Cmd is queued.
 func drain(m tea.Model, cmd tea.Cmd) (tea.Model, []tea.Msg) {
@@ -2810,7 +2582,7 @@ func drain(m tea.Model, cmd tea.Cmd) (tea.Model, []tea.Msg) {
 }
 
 // TestPopoverRenderHasNoMarker: no row in the rendered popover is prefixed
-// with the old `▸ ` arrow or a 2-space marker. Selection is a colour change,
+// with the old `▸ ` arrow or a 2 space marker. Selection is a colour change,
 // not a marker.
 func TestPopoverRenderHasNoMarker(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -2860,7 +2632,7 @@ func TestSplashEmittedOnFirstSize(t *testing.T) {
 	if !strings.Contains(joined, "devcontainer or VM") {
 		t.Fatalf("splash should recommend a sandbox: %s", joined)
 	}
-	// A second size message must not re-emit the splash. Clear the captured
+	// A second size message must not reemit the splash. Clear the captured
 	// outbox first, since production drains it but we called update() directly.
 	om.outbox = nil
 	out2, _ := om.update(tea.WindowSizeMsg{Width: 80, Height: 24})
@@ -2929,7 +2701,7 @@ func TestEmptyRunesKeyIsDropped(t *testing.T) {
 
 // TestPopoverRenderRightAligns: each row ends flush with the popover width
 // (== m.width after ANSI stripping). The value starts at column 0 and the
-// description is right-aligned.
+// description is right aligned.
 func TestPopoverRenderRightAligns(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	mm := typeInto(m, "/")
@@ -2948,206 +2720,11 @@ func TestPopoverRenderRightAligns(t *testing.T) {
 	}
 }
 
-// TestHamrpassNoArgsShowsExplainerWhenUnset: `/hamrpass` with no key set
-// prints the guided block, including the unset status line and the
-// purchase URL. No active-profile change.
-func TestHamrpassNoArgsShowsExplainerWhenUnset(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	before := m.cfg.Active
-	// Bootstrap seeds hamrpass with an empty key; assert the precondition
-	// so the test fails loud if Default() ever changes.
-	if hp, ok := m.cfg.Models["hamrpass"]; !ok || hp.Key != "" {
-		t.Fatalf("precondition: hamrpass profile with empty key, got %+v", hp)
-	}
-	m2, _ := m.runSlash("/hamrpass")
-	final := m2.(Model)
-	out := stripANSI(final.scroll.String())
-	for _, want := range []string{
-		"hamrpass",
-		"status   : unset",
-		"endpoint : https://codehamr.com",
-		"llm      : hamrpass",
-		"https://codehamr.com",
-		"/hamrpass <your key>",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("explainer missing %q in:\n%s", want, out)
-		}
-	}
-	if final.cfg.Active != before {
-		t.Fatalf("/hamrpass without args must not change active profile, got %q", final.cfg.Active)
-	}
-}
-
-// TestHamrpassNoArgsShowsSetWhenKeyPresent: status line flips to `set`
-// when the hamrpass profile already has a key.
-func TestHamrpassNoArgsShowsSetWhenKeyPresent(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	m.cfg.Models["hamrpass"].Key = "hp-already-1234567890abcdef"
-	if err := m.cfg.Save(); err != nil {
-		t.Fatal(err)
-	}
-	m2, _ := m.runSlash("/hamrpass")
-	out := stripANSI(m2.(Model).scroll.String())
-	if !strings.Contains(out, "status   : set") {
-		t.Fatalf("explainer should report status:set when key present:\n%s", out)
-	}
-}
-
-// TestHamrpassSetsKeyAndActivates: a valid key is trimmed, saved on the hamrpass
-// profile, persisted, and active flips to hamrpass. The llm client is rebuilt so
-// future requests carry the new token.
-func TestHamrpassSetsKeyAndActivates(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	if m.cfg.Active == "hamrpass" {
-		t.Fatal("precondition: active should not be hamrpass on a fresh model")
-	}
-	const key = "hp-test-key-1234567890abcdef"
-	m2, cmd := m.runSlash("/hamrpass " + key)
-	final := m2.(Model)
-	if final.cfg.Active != "hamrpass" {
-		t.Fatalf("active should switch to hamrpass, got %q", final.cfg.Active)
-	}
-	if got := final.cfg.Models["hamrpass"].Key; got != key {
-		t.Fatalf("key not stored: %q", got)
-	}
-	if final.cli.Token != key {
-		t.Fatalf("llm client token not rebuilt: %q", final.cli.Token)
-	}
-	if final.cli.Model != "hamrpass" {
-		t.Fatalf("llm client model not rebuilt: %q", final.cli.Model)
-	}
-	if cmd == nil {
-		t.Fatal("set should return a probeBackend command")
-	}
-	// Activation defers the success line until probeMsg arrives; synchronous
-	// scrollback shows the "▶ probing" placeholder. The "✓ active" line is
-	// exercised in TestHandleProbeSuccessUpdatesLiveCtxAndPrintsActivation.
-	out := stripANSI(final.scroll.String())
-	if !strings.Contains(out, "▶ probing hamrpass") {
-		t.Fatalf("expected probing placeholder in scrollback:\n%s", out)
-	}
-}
-
-// TestHamrpassLazyCreatesProfile: a user who hid hamrpass from config.yaml can
-// still activate it by pasting a key. /hamrpass <key> creates the profile from
-// canonical seed values, stores the key, and flips active.
-func TestHamrpassLazyCreatesProfile(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	delete(m.cfg.Models, "hamrpass")
-	// Persist the deletion so runSlash's reload sees a hamrpass-less config,
-	// else the on-disk seed slips back in and the lazy-create path never fires.
-	if err := m.cfg.Save(); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := m.cfg.Models["hamrpass"]; ok {
-		t.Fatal("precondition: hamrpass should be absent")
-	}
-	const key = "hp-test-key-1234567890abcdef"
-	m2, cmd := m.runSlash("/hamrpass " + key)
-	final := m2.(Model)
-	hp, ok := final.cfg.Models["hamrpass"]
-	if !ok {
-		t.Fatal("hamrpass profile should be lazy-created by /hamrpass")
-	}
-	if hp.URL != "https://codehamr.com" || hp.LLM != "hamrpass" {
-		t.Fatalf("lazy-created hamrpass has wrong canonical fields: %+v", hp)
-	}
-	if hp.Key != key {
-		t.Fatalf("key not stored on lazy-created profile: %q", hp.Key)
-	}
-	if final.cfg.Active != "hamrpass" {
-		t.Fatalf("active should switch to hamrpass, got %q", final.cfg.Active)
-	}
-	if cmd == nil {
-		t.Fatal("set should return a probeBackend command on lazy-create path too")
-	}
-}
-
-// TestHamrpassRejectsTooShort: a key under hamrpassMinKeyLen is refused
-// without touching the profile or the active selection.
-func TestHamrpassRejectsTooShort(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	beforeActive := m.cfg.Active
-	beforeKey := m.cfg.Models["hamrpass"].Key
-	m2, _ := m.runSlash("/hamrpass abc")
-	final := m2.(Model)
-	if final.cfg.Active != beforeActive {
-		t.Fatalf("active changed on rejected key: %q", final.cfg.Active)
-	}
-	if final.cfg.Models["hamrpass"].Key != beforeKey {
-		t.Fatalf("rejected key was stored: %q", final.cfg.Models["hamrpass"].Key)
-	}
-	out := stripANSI(final.scroll.String())
-	// New wording stays consistent with the popover hint:
-	// "N/16 chars · keep typing".
-	if !strings.Contains(out, "/16 chars") || !strings.Contains(out, "keep typing") {
-		t.Fatalf("expected length hint in scrollback:\n%s", out)
-	}
-}
-
-// TestHamrpassRejectsControlChars: a key with an embedded escape / NUL / DEL must
-// be rejected by hamrpassValidate, not persisted, else every dial-out errors
-// with net/http's cryptic "invalid header field value for Authorization". Real
-// hamrpass keys are ASCII-printable.
-func TestHamrpassRejectsControlChars(t *testing.T) {
-	cases := map[string]string{
-		"NUL":         "hp_secret_key_with\x00null",
-		"ESC":         "hp_secret_key_with\x1bescape",
-		"DEL":         "hp_secret_key_with\x7fdel",
-		"non-ASCII":   "hp_secret_key_with_ümlaut123",
-		"raw newline": "hp_key_one\nhp_key_two_X12",
-	}
-	for name, badKey := range cases {
-		t.Run(name, func(t *testing.T) {
-			m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-			beforeActive := m.cfg.Active
-			beforeKey := m.cfg.Models["hamrpass"].Key
-
-			_, _, ok := hamrpassValidate(badKey)
-			if ok {
-				t.Fatalf("hamrpassValidate(%q) returned ok=true; control chars must be rejected", badKey)
-			}
-
-			// And the inline /hamrpass <key> handler must not persist or activate.
-			out, _ := m.runSlash("/hamrpass " + badKey)
-			final := out.(Model)
-			if final.cfg.Active != beforeActive {
-				t.Fatalf("active changed despite invalid key: %q", final.cfg.Active)
-			}
-			if final.cfg.Models["hamrpass"].Key != beforeKey {
-				t.Fatalf("invalid key persisted to config: %q", final.cfg.Models["hamrpass"].Key)
-			}
-		})
-	}
-}
-
-// TestHamrpassRejectsMultipleArgs: a paste with embedded whitespace splits
-// into multiple args via strings.Fields. The handler refuses with a
-// dedicated message rather than silently joining or accepting one half.
-func TestHamrpassRejectsMultipleArgs(t *testing.T) {
-	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
-	beforeActive := m.cfg.Active
-	beforeKey := m.cfg.Models["hamrpass"].Key
-	m2, _ := m.runSlash("/hamrpass hp-first-half hp-second-half")
-	final := m2.(Model)
-	if final.cfg.Active != beforeActive {
-		t.Fatalf("active changed on rejected multi-arg key: %q", final.cfg.Active)
-	}
-	if final.cfg.Models["hamrpass"].Key != beforeKey {
-		t.Fatalf("rejected key was stored: %q", final.cfg.Models["hamrpass"].Key)
-	}
-	out := stripANSI(final.scroll.String())
-	if !strings.Contains(out, "cannot contain spaces") {
-		t.Fatalf("expected space-rejection error in scrollback:\n%s", out)
-	}
-}
-
 // TestMultiToolCallRoundExecutesAllBeforeNextChat: when the model emits multiple
 // tool calls in one round, EVERY result must be appended to history BEFORE the
 // next chat round. OpenAI rejects an `assistant.tool_calls` message followed by
 // fewer `tool` messages than calls issued; the captured request body lets us
-// assert both results land before the round-2 dispatch.
+// assert both results land before the round 2 dispatch.
 func TestMultiToolCallRoundExecutesAllBeforeNextChat(t *testing.T) {
 	var roundBodies [][]byte
 	turn := 0
@@ -3163,8 +2740,8 @@ func TestMultiToolCallRoundExecutesAllBeforeNextChat(t *testing.T) {
 			fmt.Fprintf(w, "data: %s\n\n", `{"type":"response.completed","response":{"usage":{"output_tokens":5}}}`)
 		default:
 			// Round 2 ends the turn: a plain content reply with NO tool call.
-			// Emitting a non-existent tool here would loop drain forever: runRaw
-			// returns "(unknown tool: ...)" and re-enters chat indefinitely.
+			// Emitting a nonexistent tool here would loop drain forever: runRaw
+			// returns "(unknown tool: ...)" and reenters chat indefinitely.
 			fmt.Fprintf(w, "data: %s\n\n", `{"type":"response.output_text.delta","delta":"both echoes finished"}`)
 			fmt.Fprintf(w, "data: %s\n\n", `{"type":"response.completed","response":{"usage":{"output_tokens":1}}}`)
 		}
@@ -3216,29 +2793,29 @@ func TestEndTurnResetsPendingSoStaleCallsDoNotLeakIntoNextTurn(t *testing.T) {
 
 // TestStaleProbeDoesNotPrintActivationBannerForNonActiveProfile: a probe for a
 // profile the user has /models'd away from must not print "✓ active: <profile>":
-// the banner would be a lie. Pairs with the connection-state guard in
+// the banner would be a lie. Pairs with the connection state guard in
 // TestStaleProbeForOldProfileDoesNotOverwriteConnectedFlag.
 func TestStaleProbeDoesNotPrintActivationBannerForNonActiveProfile(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.cfg.Active = "local"
 
-	out, _ := m.handleProbe(probeMsg{profile: "hamrpass", contextWindow: 262144})
+	out, _ := m.handleProbe(probeMsg{profile: "remote"})
 	final := out.(Model)
-	if got := stripANSI(final.scroll.String()); strings.Contains(got, "✓ active: hamrpass") {
+	if got := stripANSI(final.scroll.String()); strings.Contains(got, "✓ active: remote") {
 		t.Fatalf("stale probe must not print activation banner for non-active profile:\n%s", got)
 	}
 
 	// Sanity: probe for the live profile with the live client DOES print the banner.
 	m2 := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m2.cfg.Active = "local"
-	out2, _ := m2.handleProbe(probeMsg{profile: "local", cli: m2.cli, contextWindow: 256000})
+	out2, _ := m2.handleProbe(probeMsg{profile: "local", cli: m2.cli})
 	final2 := out2.(Model)
 	if got := stripANSI(final2.scroll.String()); !strings.Contains(got, "✓ active: local") {
 		t.Fatalf("active-profile probe must print activation banner:\n%s", got)
 	}
 }
 
-// TestNewestAssistantEmpty pins the anomaly detector behind the empty-reply
+// TestNewestAssistantEmpty pins the anomaly detector behind the empty reply
 // nudge: only a newest assistant message with neither text nor a structured
 // tool call counts as empty. A summary or a tool call is a normal turn.
 func TestNewestAssistantEmpty(t *testing.T) {
@@ -3276,10 +2853,10 @@ func TestNewestAssistantEmpty(t *testing.T) {
 }
 
 // TestEmptyReplyNudgeRePromptsThenRecovers: a turn whose first round comes back
-// with no content and no tool call (the dominant silent-death: a thinking
-// model's tool call swallowed into the reasoning channel) must be re-prompted
+// with no content and no tool call (the dominant silent death: a thinking
+// model's tool call swallowed into the reasoning channel) must be reprompted
 // once, not ended silently. Here the second round produces a real summary, so
-// the run self-heals.
+// the run self heals.
 func TestEmptyReplyNudgeRePromptsThenRecovers(t *testing.T) {
 	var round int
 	handler := func(w http.ResponseWriter, _ *http.Request) {
@@ -3298,7 +2875,7 @@ func TestEmptyReplyNudgeRePromptsThenRecovers(t *testing.T) {
 	final := drainFinal(t, m, "build it")
 
 	if round != 2 {
-		t.Fatalf("empty reply must trigger exactly one re-prompt (want 2 requests, got %d)", round)
+		t.Fatalf("empty reply must trigger exactly one reprompt (want 2 requests, got %d)", round)
 	}
 	var sawNudge bool
 	for _, msg := range final.history {
@@ -3307,7 +2884,7 @@ func TestEmptyReplyNudgeRePromptsThenRecovers(t *testing.T) {
 		}
 	}
 	if !sawNudge {
-		t.Fatalf("expected an empty-reply system nudge in history; got %+v", final.history)
+		t.Fatalf("expected an empty reply system nudge in history; got %+v", final.history)
 	}
 	scroll := stripANSI(final.scroll.String())
 	if !strings.Contains(scroll, "fixed and verified") {
@@ -3322,7 +2899,7 @@ func TestEmptyReplyNudgeRePromptsThenRecovers(t *testing.T) {
 }
 
 // TestEmptyReplyNudgeFiresOnceThenSurfaces: if the model stays empty even after
-// the re-prompt (e.g. a server that deterministically swallows the call), the
+// the reprompt (e.g. a server that deterministically swallows the call), the
 // latch must stop at one retry (no infinite loop) and the failure must be
 // surfaced rather than dying silently as before.
 func TestEmptyReplyNudgeFiresOnceThenSurfaces(t *testing.T) {
@@ -3350,11 +2927,11 @@ func TestEmptyReplyNudgeFiresOnceThenSurfaces(t *testing.T) {
 
 // TestEmptyReplyNudgeReArmsAfterProgress pins the galaxy1 fix: once an empty
 // reply has nudged this turn, a round that issues a real tool call is genuine
-// progress and must re-arm the latch, so a LATER transient empty on the same
-// long turn earns its own re-prompt instead of hitting the leak-and-die branch.
-// A flaky stream that drops the occasional call must not abandon a half-built
+// progress and must rearm the latch, so a LATER transient empty on the same
+// long turn earns its own reprompt instead of hitting the leak and die branch.
+// A flaky stream that drops the occasional call must not abandon a half built
 // file. Two CONSECUTIVE empties (no tool call between) still terminate: that
-// path has pending=0 and so never reaches the re-arm.
+// path has pending=0 and so never reaches the rearm.
 func TestEmptyReplyNudgeReArmsAfterProgress(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.installTurnContext()
@@ -3367,12 +2944,12 @@ func TestEmptyReplyNudgeReArmsAfterProgress(t *testing.T) {
 	}
 	out, _ := m.handleStreamClosed()
 	if out.(Model).emptyNudged {
-		t.Fatal("a round that issued a tool call (progress) must re-arm the empty-reply latch, not leave it consumed for the rest of the turn")
+		t.Fatal("a round that issued a tool call (progress) must re-arm the empty reply latch, not leave it consumed for the rest of the turn")
 	}
 }
 
 // drainFinal submits a prompt and pumps the whole turn to completion, returning
-// the settled model. Centralises the submit+drain dance the empty-reply tests share.
+// the settled model. Centralises the submit+drain dance the empty reply tests share.
 func drainFinal(t *testing.T, m Model, prompt string) Model {
 	t.Helper()
 	mm, cmd := m.submit(prompt, prompt, promptEntry{display: prompt})
@@ -3382,7 +2959,7 @@ func drainFinal(t *testing.T, m Model, prompt string) Model {
 
 // TestRetryEventDrivesStatusBar: an EventRetry surfaces the backoff hint in
 // the status bar (so the wait doesn't read as a frozen turn), and the next
-// stream event clears it — content means the retry succeeded, an error means
+// stream event clears it; content means the retry succeeded, an error means
 // the banner takes over.
 func TestRetryEventDrivesStatusBar(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -3402,7 +2979,7 @@ func TestRetryEventDrivesStatusBar(t *testing.T) {
 }
 
 // TestSubmitRecoversFromTransient404EndToEnd: the full submit → stream loop
-// against a backend whose first response is a 404 (the issue-#7 Agnes-AI/
+// against a backend whose first response is a 404 (the issue #7 involving a proxy and
 // LiteLLM hiccup). The turn must retry transparently and finish with the
 // assistant's content in scrollback, never an error banner.
 func TestSubmitRecoversFromTransient404EndToEnd(t *testing.T) {
@@ -3445,8 +3022,8 @@ func TestSubmitRecoversFromTransient404EndToEnd(t *testing.T) {
 // TestToolSchemasFitFixedToolsReservation is the FixedSystem pin's missing
 // sibling. The four schemas ride on every request exactly like the prompt does,
 // and they grow the same way (read_file gained offset/limit, write_file gained
-// append). Unpinned, the next parameter silently over-allocates history on
-// small-ctx profiles. On failure raise ctx.FixedTools; don't loosen this.
+// append). Unpinned, the next parameter silently over allocates history on
+// small ctx profiles. On failure raise ctx.FixedTools; don't loosen this.
 func TestToolSchemasFitFixedToolsReservation(t *testing.T) {
 	cfg, _, _ := config.Bootstrap(t.TempDir())
 	m := New(cfg, llm.New("http://x", cfg.ActiveProfile().LLM, ""), "/workspaces/codehamr", "test")
@@ -3455,17 +3032,17 @@ func TestToolSchemasFitFixedToolsReservation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if cost := len(wire) / 4; cost > chmctx.FixedTools {
-		t.Fatalf("tool schemas cost %d tokens, FixedTools reserves only %d - "+
+		t.Fatalf("tool schemas cost %d tokens, FixedTools reserves only %d: "+
 			"raise ctx.FixedTools so Budget() doesn't over-allocate to history",
 			cost, chmctx.FixedTools)
 	}
 }
 
-// TestFailureStreakSurvivesBatchedSuccess: the loop-breaker must count a target
+// TestFailureStreakSurvivesBatchedSuccess: the loop breaker must count a target
 // that keeps failing even when the model batches a succeeding call alongside it.
 // Resetting the streak on ANY success is defeated by the most natural batch
-// there is - a failing edit_file paired with a succeeding read_file - which
-// would leave the first supervision to the runaway cap, dozens of round-trips
+// there is: a failing edit_file paired with a succeeding read_file: which
+// would leave the first supervision to the runaway cap, dozens of round trips
 // later.
 func TestFailureStreakSurvivesBatchedSuccess(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
@@ -3480,7 +3057,7 @@ func TestFailureStreakSurvivesBatchedSuccess(t *testing.T) {
 	}
 	m.maybeFailureNudge()
 	if n := countSystem(m.history); n != 1 {
-		t.Fatalf("a same-target failure streak must nudge, got %d system notes", n)
+		t.Fatalf("a same target failure streak must nudge, got %d system notes", n)
 	}
 	// A success on the FAILING target still clears it: that is real recovery.
 	m.lastToolKey = "edit_file|src/app.js"
@@ -3492,8 +3069,8 @@ func TestFailureStreakSurvivesBatchedSuccess(t *testing.T) {
 }
 
 // TestVerifyNudgeSkipsReadOnlyTurn: a turn that only read files produced no
-// artifact that could be falsely called green, so re-grounding it is a wasted
-// round-trip on every research question.
+// artifact that could be falsely called green, so re grounding it is a wasted
+// round trip on every research question.
 func TestVerifyNudgeSkipsReadOnlyTurn(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	m.toolRounds = verifyNudgeMinRounds + 20
@@ -3513,10 +3090,10 @@ func TestVerifyNudgeSkipsReadOnlyTurn(t *testing.T) {
 	}
 }
 
-// TestMidStreamDropReplaysWithoutDuplicating: a socket that dies mid-answer
+// TestMidStreamDropReplaysWithoutDuplicating: a socket that dies mid answer
 // must be retried transparently instead of ending the turn. History is written
 // only on EventDone, so the replayed round must leave exactly one assistant
-// message - not the partial text plus the retry.
+// message: not the partial text plus the retry.
 func TestMidStreamDropReplaysWithoutDuplicating(t *testing.T) {
 	var round int
 	handler := func(w http.ResponseWriter, _ *http.Request) {
@@ -3537,7 +3114,7 @@ func TestMidStreamDropReplaysWithoutDuplicating(t *testing.T) {
 	final := drainFinal(t, m, "answer me")
 
 	if round != 2 {
-		t.Fatalf("a mid-stream drop must be replayed once (want 2 requests, got %d)", round)
+		t.Fatalf("a mid stream drop must be replayed once (want 2 requests, got %d)", round)
 	}
 	var assistants []string
 	for _, msg := range final.history {
@@ -3558,12 +3135,12 @@ func TestMidStreamDropReplaysWithoutDuplicating(t *testing.T) {
 
 // TestFailureStreakDecaysOnRealProgress is the counterweight to
 // TestFailureStreakSurvivesBatchedSuccess. A read can't fix anything, so it must
-// not clear the streak - but every other success is progress and must. The
+// not clear the streak: but every other success is progress and must. The
 // canonical healthy loop is a succeeding edit_file batched with a `go test` that
 // still fails, on a different error each round. Letting that build a streak
 // hands a converging model a note saying "stop repeating it ... or tell the user
 // what's blocking you" five errors into ten, which ctx.Pack then demotes to the
-// USER role on the wire - so a 30B reads its own user telling it to give up.
+// USER role on the wire: so a 30B reads its own user telling it to give up.
 func TestFailureStreakDecaysOnRealProgress(t *testing.T) {
 	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
 	for i := range maxToolFailStreak + 3 {
@@ -3578,5 +3155,27 @@ func TestFailureStreakDecaysOnRealProgress(t *testing.T) {
 	m.maybeFailureNudge()
 	if n := countSystem(m.history); n != 0 {
 		t.Fatalf("a converging build loop must not be told to stop, got %d system notes:\n%+v", n, m.history)
+	}
+}
+
+func TestCommandRegistry(t *testing.T) {
+	if len(commands) != 2 || commandByName("/clear") == nil || commandByName("/models") == nil {
+		t.Fatal("expected exactly /clear and /models")
+	}
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	out, cmd := m.runSlash("/unknown-command")
+	if cmd != nil || !strings.Contains(stripANSI(out.(Model).scroll.String()), "unknown command") {
+		t.Fatal("unknown commands must show help without starting an action")
+	}
+}
+
+func TestProbeSuccessUsesConfiguredContext(t *testing.T) {
+	m := newTestModel(t, func(http.ResponseWriter, *http.Request) {})
+	m.cfg.ActiveProfile().ContextSize = 65536
+	m.connected = false
+	out, _ := m.handleProbe(probeMsg{profile: m.cfg.Active, cli: m.cli})
+	final := out.(Model)
+	if !final.connected || final.activeContextSize() != 65536 || !strings.Contains(stripANSI(final.scroll.String()), "✓ active: local") {
+		t.Fatal("successful activation must retain the configured context and print confirmation")
 	}
 }

@@ -9,41 +9,41 @@ import (
 
 // readChunkBytes bounds one read_file result. Deliberately under
 // chmctx.ToolOutputCap*4 (24000 bytes): at the cap, Execute's Truncate would
-// re-fire on the window and drop its middle, silently reinstating the
+// re fire on the window and drop its middle, silently reinstating the
 // unrecoverable dead end that offset/limit exists to remove.
 const readChunkBytes = 20000
 
 // maxFileBytes gates read_file and edit_file: both slurp the whole file with
-// os.ReadFile, so a multi-GB log would OOM-kill the TUI - the same hazard
+// os.ReadFile, so a multi GB log would OOM kill the TUI: the same hazard
 // bash's headTailBuffer capture cap exists to stop, unguarded in the file
 // tools. 5MB covers every real source file; anything bigger is a log or an
 // artifact, which grep/sed handle without loading it.
 const maxFileBytes = 5 << 20
 
 // ReadFile returns a window of path's contents: whole lines from offset
-// (1-indexed, 0 meaning the start) up to limit lines, bounded by
+// (counted from 1, 0 meaning the start) up to limit lines, bounded by
 // readChunkBytes. When the window stops short, the result names the exact
 // offset to continue from, so a big file is read by repeated calls instead of
 // guessed at from a truncated middle.
 //
 // Per the bash/write/edit convention, filesystem errors come back in the
-// output string, never as a Go error: the model reacts to them like a non-zero
+// output string, never as a Go error: the model reacts to them like a nonzero
 // exit.
 func ReadFile(path string, offset, limit int) string {
 	if path == "" {
 		return "(empty path)"
 	}
-	// Refuse non-regular files up front: open(2) on a FIFO blocks forever
+	// Refuse non regular files up front: open(2) on a FIFO blocks forever
 	// waiting for a writer (leaking the tool goroutine past Ctrl+C, which
 	// cancels the turn but can't unblock the read), and an endless device file
 	// (/dev/zero) grows ReadFile's buffer without bound. Stat never blocks.
-	// The same Stat size-gates the whole-file read below (see maxFileBytes).
+	// The same Stat size gates the whole file read below (see maxFileBytes).
 	if info, err := os.Stat(path); err == nil {
 		if !info.Mode().IsRegular() && !info.IsDir() {
 			return fmt.Sprintf("(read error: %s is not a regular file)", path)
 		}
 		if info.Mode().IsRegular() && info.Size() > maxFileBytes {
-			return fmt.Sprintf("(too large: %s is %d bytes, over read_file's %dMB cap - read slices with bash instead: grep -n pattern, or sed -n '1,200p')", path, info.Size(), maxFileBytes>>20)
+			return fmt.Sprintf("(too large: %s is %d bytes, over read_file's %dMB cap: read slices with bash instead: grep -n pattern, or sed -n '1,200p')", path, info.Size(), maxFileBytes>>20)
 		}
 	}
 	raw, err := os.ReadFile(path)
@@ -71,8 +71,8 @@ func ReadFile(path string, offset, limit int) string {
 	if limit > 0 && start+limit < end {
 		end = start + limit
 	}
-	// Byte-bound the window on top of the line bound, cutting whole lines. The
-	// i > start guard keeps a single over-long line (a minified bundle is one
+	// Byte bound the window on top of the line bound, cutting whole lines. The
+	// i > start guard keeps a single over long line (a minified bundle is one
 	// 2MB line) from collapsing the window to nothing; the byte cut below
 	// catches that case instead.
 	for i, used := start, 0; i < end; i++ {
@@ -88,12 +88,12 @@ func ReadFile(path string, offset, limit int) string {
 	}
 	// Independent checks, never a switch: a file whose FIRST line is a minified
 	// bundle still has ordinary lines after it, and an exclusive branch would
-	// print the byte-cut note and swallow the continuation offset - reinstating
+	// print the byte cut note and swallow the continuation offset: reinstating
 	// the dead end offset/limit exists to remove.
 	if len(out) > readChunkBytes {
 		// One line longer than the whole window. Cut bytes rather than return
 		// nothing, snapping back to a rune boundary so the cut can't split a
-		// multi-byte character. Only the boundary is adjusted: sanitising the
+		// multi byte character. Only the boundary is adjusted: sanitising the
 		// whole prefix would silently delete invalid bytes from the middle of a
 		// file read_file promised to return exactly.
 		cut := readChunkBytes
@@ -122,7 +122,7 @@ func ReadFileSchema() map[string]any {
 		"type": "function",
 		"function": map[string]any{
 			"name":        ReadFileName,
-			"description": "Read a file and return its contents. Prefer this over `cat`/`sed` in bash for inspecting a file - no shell quoting, exact bytes. Long files come back one window at a time; the result names the exact offset to continue from, so repeated calls read the whole file with no guessing. Reading several files? Put those calls in one message.",
+			"description": "Read a file and return its contents. Prefer this over `cat`/`sed` in bash for inspecting a file: no shell quoting, exact bytes. Long files come back one window at a time; the result names the exact offset to continue from, so repeated calls read the whole file with no guessing. Reading several files? Put those calls in one message.",
 			"parameters": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -132,7 +132,7 @@ func ReadFileSchema() map[string]any {
 					},
 					"offset": map[string]any{
 						"type":        "integer",
-						"description": "Optional 1-indexed line to start at. Default 1.",
+						"description": "Optional starting line, counted from 1. Default 1.",
 					},
 					"limit": map[string]any{
 						"type":        "integer",

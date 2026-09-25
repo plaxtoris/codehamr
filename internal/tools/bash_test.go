@@ -26,7 +26,7 @@ func TestBashNonZeroExitNotFatal(t *testing.T) {
 	}
 }
 
-// TestBashExactExitMarkerFormat pins the exact non-zero-exit shape: output,
+// TestBashExactExitMarkerFormat pins the exact non zero exit shape: output,
 // then a single "\n(exit: ...)" marker. The model parses these, and the other
 // tests only Contains("exit"); a dropped "\n" or doubled marker would pass
 // silently. Also proves real output survives alongside the exit (the `false`
@@ -46,7 +46,7 @@ func TestBashEmptyCommand(t *testing.T) {
 }
 
 // TestBashBoundsRunawayOutput: a firehose command must not grow an unbounded
-// buffer (the old CombinedOutput OOM-killed the whole TUI on `cat big.iso`
+// buffer (the old CombinedOutput OOM killed the whole TUI on `cat big.iso`
 // well before the timeout could react). The capture keeps head+tail with an
 // OMITTED marker between, mirroring ctx.Truncate's framing, and preserves the
 // very first and very last bytes so the model still sees both ends.
@@ -71,7 +71,7 @@ func TestBashBoundsRunawayOutput(t *testing.T) {
 }
 
 // TestHeadTailBufferSmallOutputUntouched: output under the head cap must come
-// back byte-identical - the bounding must be invisible in the normal case.
+// back byte identical: the bounding must be invisible in the normal case.
 func TestHeadTailBufferSmallOutputUntouched(t *testing.T) {
 	var b headTailBuffer
 	b.Write([]byte("hello "))
@@ -82,7 +82,7 @@ func TestHeadTailBufferSmallOutputUntouched(t *testing.T) {
 }
 
 // TestHeadTailBufferKeepsExactHeadAndTail: once the middle is dropped, the
-// reassembly must carry exactly the first head-cap bytes and the last tail-cap
+// reassembly must carry exactly the first head cap bytes and the last tail cap
 // bytes in order, across chunked writes that wrap the ring several times.
 func TestHeadTailBufferKeepsExactHeadAndTail(t *testing.T) {
 	var b headTailBuffer
@@ -104,9 +104,9 @@ func TestHeadTailBufferKeepsExactHeadAndTail(t *testing.T) {
 	}
 }
 
-// TestBashHonorsAlreadyCancelledParent: a pre-cancelled parent (Ctrl+C raced
+// TestBashHonorsAlreadyCancelledParent: a pre cancelled parent (Ctrl+C raced
 // the dispatch) must report "(cancelled)", not "(empty command)" or, worse,
-// spawn a fresh /bin/sh. The cancel must win even on the empty-cmd fast path.
+// spawn a fresh /bin/sh. The cancel must win even on the empty cmd fast path.
 func TestBashHonorsAlreadyCancelledParent(t *testing.T) {
 	parent, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -178,7 +178,7 @@ func TestBashTimeoutOverflowClamped(t *testing.T) {
 	}
 }
 
-// TestBashParentCancelMidRun: parent cancel mid-sleep returns "(cancelled)",
+// TestBashParentCancelMidRun: parent cancel mid sleep returns "(cancelled)",
 // not a misleading "(timeout after Xs)" or stale exit code. Parent cancel
 // wins when it fires before the deadline: it's the user's signal (a latched
 // DeadlineExceeded still labels as timeout, since the timeout killed first).
@@ -204,7 +204,7 @@ func TestBashParentCancelMidRun(t *testing.T) {
 
 func TestBashBackgroundedChildDoesNotBlock(t *testing.T) {
 	// A naked `cmd &` leaves the child holding stdout/stderr pipes. We must not
-	// block on them after /bin/sh exits, which caused multi-minute stalls
+	// block on them after /bin/sh exits, which caused multi minute stalls
 	// before WaitDelay was set.
 	start := time.Now()
 	Bash(context.Background(), "sleep 3 &", 5*time.Second)
@@ -265,12 +265,12 @@ func TestInlineStatusGeneric(t *testing.T) {
 	}
 }
 
-// TestInlineStatusRuneBoundaryTruncate: truncating a long non-ASCII command at
-// a fixed byte offset can split a multi-byte rune, leaving an orphan
-// continuation byte the TUI prints as invalid UTF-8. The cut must snap back to
-// a rune boundary, trading a couple chars off the byte budget for valid UTF-8.
+// TestInlineStatusRuneBoundaryTruncate: truncating a long non ASCII command at
+// a fixed byte offset can split a multi byte rune, leaving an orphan
+// continuation byte the TUI prints as invalid UTF 8. The cut must snap back to
+// a rune boundary, trading a couple chars off the byte budget for valid UTF 8.
 func TestInlineStatusRuneBoundaryTruncate(t *testing.T) {
-	cmd := strings.Repeat("ä", 100) + " end" // 200+ bytes of 2-byte runes
+	cmd := strings.Repeat("ä", 100) + " end" // 200+ bytes of 2 byte runes
 	s := InlineStatus(chmctx.ToolCall{
 		Name:      "bash",
 		Arguments: map[string]any{"cmd": cmd},
@@ -281,11 +281,11 @@ func TestInlineStatusRuneBoundaryTruncate(t *testing.T) {
 }
 
 // TestRunRawSurfacesTruncatedToolArgs: the _parse_error sentinel (set by
-// llm.resolve when the server truncates an oversized tool call mid-JSON) must
+// llm.resolve when the server truncates an oversized tool call mid JSON) must
 // surface as an actionable message naming the cause + chunked recovery, not
 // fall through the type assertions to a misleading "(empty path)" / "(empty
 // command)". Checked for a file tool and bash to pin that the guard is generic,
-// sitting before the per-tool switch.
+// sitting before the per tool switch.
 func TestRunRawSurfacesTruncatedToolArgs(t *testing.T) {
 	for _, name := range []string{WriteFileName, BashName} {
 		call := chmctx.ToolCall{
@@ -306,8 +306,8 @@ func TestRunRawSurfacesTruncatedToolArgs(t *testing.T) {
 
 // TestExecuteSpillsOversizeOutput: when Truncate drops the middle of a big
 // result, the full bytes must land in a file the model can grep. Without it
-// the only way back to the dropped middle is re-running the command that
-// produced it, which is the round-trip this exists to remove.
+// the only way back to the dropped middle is rerunning the command that
+// produced it, which is the round trip this exists to remove.
 func TestExecuteSpillsOversizeOutput(t *testing.T) {
 	msg := Execute(context.Background(), chmctx.ToolCall{
 		Name:      BashName,

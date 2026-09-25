@@ -1,6 +1,6 @@
 @echo off
 REM codehamr Windows installer: fetch the latest release binary and install it
-REM into a user-writable prefix so admin elevation is never needed.
+REM into a user writable prefix so admin elevation is never needed.
 REM
 REM Usage (cmd.exe):
 REM   curl -fsSL https://raw.githubusercontent.com/codehamr/codehamr/main/install.cmd -o install.cmd ^&^& install.cmd
@@ -13,7 +13,7 @@ cls
 
 set "REPO=codehamr/codehamr"
 
-REM --- Detect arch. PROCESSOR_ARCHITEW6432 catches the 32-bit-cmd-on-64-bit-OS case.
+REM Detect arch. PROCESSOR_ARCHITEW6432 catches the 32 bit cmd on 64 bit OS case.
 set "arch="
 if /I "%PROCESSOR_ARCHITECTURE%"=="AMD64" set "arch=amd64"
 if /I "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "arch=arm64"
@@ -23,8 +23,8 @@ if not defined arch (
   exit /b 1
 )
 
-REM --- Pick install dir. Explicit PREFIX wins. Default lands under LOCALAPPDATA,
-REM     the conventional per-user install root that never needs admin rights.
+REM Pick install dir. Explicit PREFIX wins. Default lands under LOCALAPPDATA,
+REM     the conventional per user install root that never needs admin rights.
 if defined PREFIX (
   set "bindir=%PREFIX%\bin"
 ) else (
@@ -42,8 +42,8 @@ if not exist "%bindir%" (
   exit /b 1
 )
 
-REM --- Download. curl.exe ships with Windows 10 1803+ / 11; fall back to PowerShell
-REM     (Invoke-WebRequest) on older boxes so a single script covers both.
+REM Download. curl.exe ships with Windows 10 1803+ / 11; fall back to PowerShell
+REM     on older systems so a single script covers both.
 where curl >nul 2>&1
 if %errorlevel%==0 (
   curl -fsSL "%url%" -o "%bindir%\codehamr.exe"
@@ -55,9 +55,9 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [ok] installed -^> %bindir%\codehamr.exe
+echo [ok] installed: %bindir%\codehamr.exe
 
-REM --- Ensure bindir is on the user's persistent PATH.
+REM Ensure bindir is on the user's persistent PATH.
 REM     Read HKCU\Environment\Path directly. Using %PATH% here would be wrong:
 REM     it's the merged user+system live value, and writing it back via setx
 REM     would clone system entries into the user hive and clobber the
@@ -79,7 +79,7 @@ if defined needs_setx (
   echo   added %bindir% to user PATH ^(persists for new shells^)
 )
 
-REM --- Patch the LIVE session PATH so cmd.exe users can run codehamr immediately
+REM Patch the LIVE session PATH so cmd.exe users can run codehamr immediately
 REM     without opening a new terminal. Propagated past `endlocal` via the standard
 REM     `endlocal ^& set` idiom (PATH is captured at parse time, then restored to
 REM     the parent scope). This will NOT reach a parent PowerShell process if the

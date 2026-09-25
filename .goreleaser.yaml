@@ -4,10 +4,10 @@ builds:
   - main: ./cmd/codehamr
     binary: codehamr
     # Force static linking on every target. goreleaser v2 inherits the runner's
-    # ambient env, so the NATIVE amd64 build on a gcc-equipped runner would link
-    # CGO=1/dynamic (glibc-versioned) while the cross builds get CGO=0/static,
-    # the asymmetry that shipped a dynamic linux-amd64 binary which fails to exec
-    # after auto-update on musl/old-glibc hosts. codehamr is pure-Go, so CGO is
+    # ambient env, so the NATIVE amd64 build on a gcc equipped runner would link
+    # CGO=1/dynamic (glibc versioned) while the cross builds get CGO=0/static,
+    # the asymmetry that shipped a dynamic linux amd64 binary which fails to exec
+    # after auto update on hosts using musl or older glibc. codehamr is pure Go, so CGO is
     # never needed; pinning it off keeps the delivered binary runnable anywhere.
     env:
       - CGO_ENABLED=0

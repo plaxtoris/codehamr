@@ -60,9 +60,9 @@ func TestEditFileOldNotFound(t *testing.T) {
 }
 
 // TestEditFileWhitespaceFuzzyApply: a miss whose only difference is
-// indentation, matching whole lines exactly once, is APPLIED (the retyped-
-// indentation failure is the canonical weak-model edit_file miss; a unique
-// whole-line match preserves the exactly-once guarantee). new_string goes in
+// indentation, matching whole lines exactly once, is APPLIED (the retyped
+// indentation failure is the canonical weak model edit_file miss; a unique
+// whole line match preserves the exactly once guarantee). new_string goes in
 // as given; every surrounding byte survives exactly.
 func TestEditFileWhitespaceFuzzyApply(t *testing.T) {
 	dir := t.TempDir()
@@ -83,8 +83,8 @@ func TestEditFileWhitespaceFuzzyApply(t *testing.T) {
 	}
 }
 
-// TestEditFileWhitespaceFuzzyApplyMultiline: an indent-shifted multi-line
-// block applies, preserving the lines around it byte-exactly.
+// TestEditFileWhitespaceFuzzyApplyMultiline: an indent shifted multi line
+// block applies, preserving the lines around it byte exactly.
 func TestEditFileWhitespaceFuzzyApplyMultiline(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f.py")
@@ -103,9 +103,9 @@ func TestEditFileWhitespaceFuzzyApplyMultiline(t *testing.T) {
 	}
 }
 
-// TestEditFileWhitespaceNearMissMidLineStillHints: a whitespace near-miss that
+// TestEditFileWhitespaceNearMissMidLineStillHints: a whitespace near miss that
 // is NOT a run of whole lines (the match covers only part of a line) must not
-// fuzzy-apply; it keeps the diagnostic hint and the file stays untouched.
+// fuzzy apply; it keeps the diagnostic hint and the file stays untouched.
 func TestEditFileWhitespaceNearMissMidLineStillHints(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f.go")
@@ -122,8 +122,8 @@ func TestEditFileWhitespaceNearMissMidLineStillHints(t *testing.T) {
 	}
 }
 
-// TestEditFileWhitespaceFuzzyAmbiguousFails: two whole-line fuzzy matches must
-// not apply - the exactly-once guarantee holds in the fuzzy path too.
+// TestEditFileWhitespaceFuzzyAmbiguousFails: two whole line fuzzy matches must
+// not apply: the exactly once guarantee holds in the fuzzy path too.
 func TestEditFileWhitespaceFuzzyAmbiguousFails(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f.txt")
@@ -157,8 +157,8 @@ func TestEditFileOldNotUnique(t *testing.T) {
 }
 
 // TestEditFileOverlappingOldString: strings.Count sees only one
-// non-overlapping "==" in "a === b", but it matches at two positions with
-// different results; the exactly-once guarantee must reject it.
+// non overlapping "==" in "a === b", but it matches at two positions with
+// different results; the exactly once guarantee must reject it.
 func TestEditFileOverlappingOldString(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f.txt")
@@ -323,7 +323,7 @@ func TestEditFileTooLargeRefused(t *testing.T) {
 
 // TestEditFileAmbiguousNamesLines: the ambiguous failure names the line of
 // each occurrence the scan already visited, so the model can disambiguate
-// without a full re-read round.
+// without a full reread round.
 func TestEditFileAmbiguousNamesLines(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f.txt")

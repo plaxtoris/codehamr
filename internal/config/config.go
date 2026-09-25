@@ -1,6 +1,5 @@
 // Package config owns the .codehamr/ directory: config.yaml plus the
-// embedded default system prompt. The prompt lives only in the binary,
-// never on disk, so it's untamperable and every release ships it consistent.
+// embedded default system prompt. Changes to the prompt require a rebuild.
 package config
 
 import (
@@ -22,89 +21,40 @@ var DefaultSystemPrompt string
 
 const DirName = ".codehamr"
 
-// defaultContextSize is the local profile's packing budget and the floor
-// Bootstrap coerces a bogus/missing context_size to. It is the seeded local
-// model's full native window (qwen3.8:27b: 262144 = 256k), so a correctly
-// provisioned server gets the whole thing without hand-tuning. Ollama's /v1
-// shim reports no X-Context-Window, so codehamr packs to this value blind: on a
-// server configured for less, the prompt is silently front-truncated, dropping
-// the embedded system prompt and early tool results with no error. Users whose
-// server honors less (stock Ollama defaults far lower; see README) lower this
-// to match their num_ctx / OLLAMA_CONTEXT_LENGTH.
+// defaultContextSize is the initial packing window. Set context_size to the
+// window served by the chosen backend.
 const defaultContextSize = 262144
 
-// cloudProfileNames are profiles whose context_size the server sets via the
-// X-Context-Window header. We leave their on-disk context_size empty:
-// Bootstrap won't seed it, coercion won't default it, and the TUI reads the
-// live value per response. Local Ollama has no header channel, so config.yaml
-// stays canonical there.
-var cloudProfileNames = map[string]struct{}{
-	"hamrpass": {},
-}
-
-// IsCloudProfile reports whether a profile's context_size is server-managed.
-func IsCloudProfile(name string) bool {
-	_, ok := cloudProfileNames[name]
-	return ok
-}
-
-// managedProfiles are seeded on first run: a local Ollama target and the
-// hosted hamrpass endpoint (empty key, since /hamrpass pastes it, re-creating
-// the entry from this seed if the user deleted it). After first run config.yaml
-// is the user's: deletions and renames stick, Bootstrap never re-adds anything.
-// hamrpass keeps ContextSize=0 so omitempty drops it from disk: users can't
-// tune what the server already manages.
-var managedProfiles = map[string]Profile{
-	"local": {
-		LLM:         "qwen3.8:27b",
-		URL:         "http://localhost:11434",
-		Key:         "",
-		ContextSize: defaultContextSize,
-	},
-	"hamrpass": {
-		LLM: "hamrpass",
-		URL: "https://codehamr.com",
-		Key: "",
-	},
-}
-
-// Profile is one named model endpoint in config.yaml; `/models` switches
-// between them. ContextSize is omitempty so server-managed cloud profiles omit
-// it on disk while user-managed profiles round-trip a concrete value.
+// Profile names are user defined. Every endpoint uses the same settings.
 type Profile struct {
 	LLM         string `yaml:"llm"`
 	URL         string `yaml:"url"`
 	Key         string `yaml:"key"`
-	ContextSize int    `yaml:"context_size,omitempty"`
+	ContextSize int    `yaml:"context_size"`
 }
 
-// Config is the on-disk schema at .codehamr/config.yaml. Strict decoding:
-// unknown top-level keys fail Bootstrap so typos and stale schemas surface
+// Config is the on disk schema at .codehamr/config.yaml. Strict decoding:
+// unknown top level keys fail Bootstrap so typos and stale schemas surface
 // immediately rather than being silently ignored.
 type Config struct {
 	Active string              `yaml:"active"`
 	Models map[string]*Profile `yaml:"models"`
-	// Logging writes a fresh log.txt each start and appends every exchange.
-	// Debug instrumentation; removable with this field, debuglog.go, and the
-	// dbgWrite call sites.
+	// Logging replaces log.txt at startup and records prompts and tool activity.
 	Logging bool `yaml:"logging,omitempty"`
-	// runtime-only (not serialized)
+	// runtime only (not serialized)
 	Dir string `yaml:"-"`
 	// URLOverride, if set, wins over ActiveProfile().URL everywhere we dial
 	// out. Kept off the Profile map so the runtime CODEHAMR_URL override never
-	// round-trips into Save().
+	// round trips into Save().
 	URLOverride string `yaml:"-"`
 }
 
 func Default() *Config {
-	models := make(map[string]*Profile, len(managedProfiles))
-	for name, p := range managedProfiles {
-		cp := p
-		models[name] = &cp
-	}
 	return &Config{
 		Active: "local",
-		Models: models,
+		Models: map[string]*Profile{
+			"local": {LLM: "qwen3.8:27b", URL: "http://localhost:11434", ContextSize: defaultContextSize},
+		},
 	}
 }
 
@@ -112,10 +62,8 @@ func Default() *Config {
 // and config.yaml on first use. config.yaml is never overwritten; the prompt
 // is embedded, never written to disk.
 //
-// The directory check uses Lstat (not Stat) and refuses a pre-existing
-// .codehamr that isn't a real directory: a symlink there would let a co-tenant
-// redirect config.yaml to an attacker path, planting a models.<name>.url that
-// proxies the hamrpass key on the next dial-out.
+// Refuse symlinks so a redirected project directory cannot silently replace
+// the configured endpoint or capture its API key.
 func Bootstrap(projectRoot string) (*Config, bool, error) {
 	dir := filepath.Join(projectRoot, DirName)
 	created := false
@@ -128,17 +76,12 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 		if !info.IsDir() {
 			return nil, false, fmt.Errorf("%s: exists but is not a directory", dir)
 		}
-		// Tighten a pre-existing loose dir (created by an older release or by
-		// hand): same upgrade-path rationale as Save's fresh-temp-inode trick
-		// for config.yaml, applied to the directory the threat comment below
-		// is about. Best-effort; a failure here shouldn't block launch.
+		// Tighten existing directory permissions when possible.
 		if info.Mode().Perm() != 0o700 {
 			_ = os.Chmod(dir, 0o700)
 		}
 	case errors.Is(err, os.ErrNotExist):
-		// 0o700: config.yaml may carry the hamrpass key (a long-lived bearer
-		// token). A world-listable dir lets other local users spot it and probe
-		// for the key. Only the project owner should read here.
+		// Configuration can contain API keys. Restrict access to the owner.
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return nil, false, err
 		}
@@ -150,7 +93,7 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 	cfgPath := filepath.Join(dir, "config.yaml")
 	// Same symlink defence as the directory check: a symlinked config.yaml
 	// could redirect the read (which config we honour) or the write (clobbering
-	// an arbitrary user-writable file with the seed). Refuse with a clear error.
+	// an arbitrary user writable file with the seed). Refuse with a clear error.
 	if li, err := os.Lstat(cfgPath); err == nil && li.Mode()&os.ModeSymlink != 0 {
 		return nil, false, fmt.Errorf("%s: refuses to follow symlink, remove or replace with a real file", cfgPath)
 	}
@@ -179,23 +122,16 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 			return nil, false, fmt.Errorf("config.yaml: profile %q is empty; remove it or fill in the required fields", name)
 		}
 	}
-	// Coerce missing/zero/negative context_size to the default. The packer
-	// subtracts fixed reservations and floors at 0, so a bogus value would
-	// silently degenerate packing to "keep only the newest message". Coerce
-	// here so nothing downstream has to defend. Cloud profiles are exempt:
-	// their size arrives via X-Context-Window on the first response, and the
-	// TUI holds a runtime fallback until then.
-	for name, p := range cfg.Models {
-		if IsCloudProfile(name) {
-			continue
-		}
+	// Use the same packing default for every profile when its size is omitted
+	// or invalid. Explicit values remain under the user's control.
+	for _, p := range cfg.Models {
 		if p.ContextSize <= 0 {
 			p.ContextSize = defaultContextSize
 		}
 	}
 	// Coerce a dangling Active to the first profile in sorted order
 	// (deterministic). With no profiles at all, fail loud, since runtime would
-	// otherwise nil-deref on the first dial-out.
+	// otherwise nil deref on the first dial out.
 	if _, ok := cfg.Models[cfg.Active]; !ok {
 		names := cfg.ModelNames()
 		if len(names) == 0 {
@@ -207,31 +143,9 @@ func Bootstrap(projectRoot string) (*Config, bool, error) {
 	return cfg, created, nil
 }
 
-// EnsureHamrpass returns the hamrpass profile, re-creating it from the seed if
-// the user deleted it. Lets /hamrpass activate by pasting a key without a
-// restart detour.
-func (c *Config) EnsureHamrpass() *Profile {
-	if hp, ok := c.Models["hamrpass"]; ok {
-		return hp
-	}
-	tmpl := managedProfiles["hamrpass"]
-	if c.Models == nil {
-		c.Models = map[string]*Profile{}
-	}
-	c.Models["hamrpass"] = &tmpl
-	return c.Models["hamrpass"]
-}
-
-// ResolvedKey returns the profile's key, expanding it against the process
-// environment when the WHOLE key is a `${VAR}` reference (the advertised
-// form; see the config.yaml header). Lets config.yaml carry `key: ${MY_KEY}`
-// instead of a plaintext secret: the reference is what round-trips on Save,
-// the expansion happens only at read time so the resolved value never touches
-// disk. Anything else passes through verbatim: os.ExpandEnv here would
-// silently corrupt literal keys containing '$' (llama.cpp/LiteLLM proxy keys
-// like "pa$$word" become "paword", then 401 with no hint anywhere), and
-// ExpandEnv has no escape syntax to opt out. Use this at every site that
-// dials out or branches on "is this profile keyed".
+// ResolvedKey expands a whole ${VARIABLE_NAME} reference at runtime. Save
+// retains the reference. Other values are literal so keys containing dollar
+// signs are not corrupted by general environment expansion.
 func (p *Profile) ResolvedKey() string {
 	key := p.Key
 	if name, ok := strings.CutPrefix(key, "${"); ok {
@@ -272,51 +186,36 @@ func writeYAML(path string, v any) error {
 	if err != nil {
 		return err
 	}
-	// Re-prepended every Save since yaml.Marshal drops free-form comments, the
-	// only place a hint survives. The sandbox line catches the top first-run
-	// footgun: in a devcontainer/WSL2 with Ollama on the host, `localhost`
-	// doesn't reach the host and yields a baffling "connection refused". Native
-	// users aren't affected, hence sandbox-vs-host framing over an OS-specific one.
+	// Restore the usage header because yaml.Marshal does not retain comments.
 	header := []byte(`# codehamr configuration
 #
-# Running codehamr in a devcontainer / WSL2 with Ollama on the host:
-# swap 'http://localhost:11434' with 'http://host.docker.internal:11434' below.
+# In a devcontainer with Ollama on the host, use
+# http://host.docker.internal:11434 instead of http://localhost:11434.
 #
-# Keys: ` + "`key: ${MY_KEY}`" + ` expands the env var at runtime, so the reference (not
-# the secret) round-trips on Save. Literal keys still work for backward compat.
+# A key such as ${OPENROUTER_API_KEY} reads the environment at runtime.
+# Save preserves the reference. Literal API keys are also supported.
 #
-# context_size is what codehamr packs to - set it to your server's ACTUAL window,
-# not the model's theoretical max. For Ollama that's OLLAMA_CONTEXT_LENGTH (or a
-# Modelfile 'PARAMETER num_ctx'); too high and the server silently drops the
-# oldest messages. More VRAM lets you raise both together.
+# Set context_size to the window your server actually serves.
+# For Ollama, match OLLAMA_CONTEXT_LENGTH or the Modelfile num_ctx value.
+# The local default is 262144. Lower it when your server serves less.
 #
-# The seeded 262144 is qwen3.8:27b's full 256k window; your server only delivers
-# it if told to (start Ollama with OLLAMA_CONTEXT_LENGTH=262144). Serving less?
-# Lower 'context_size' here to match.
+# OpenRouter uses https://openrouter.ai/api/v1 and a provider/model ID.
 
 `)
-	// Write to a sibling temp then rename over config.yaml. Rename is atomic
-	// within the directory, so a crash, signal, or full disk mid-write can never
-	// leave a truncated config.yaml, which Bootstrap's strict decode would fatal
-	// on, bricking the next launch until the file is hand-deleted. Mirrors
-	// internal/update's promote-by-rename. os.CreateTemp makes the temp 0o600 and
-	// rename installs that fresh inode in place, so this also closes the
-	// upgrade-path leak the old in-place write needed a trailing Chmod for:
-	// config.yaml carries the hamrpass key, and only the project owner should
-	// read it.
+	// Write a sibling temporary file and rename it into place so failed writes
+	// leave the previous configuration intact. CreateTemp sets mode 0o600,
+	// restricting the saved keys to the owner even if the old file was permissive.
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".config-*.yaml")
 	if err != nil {
 		return err
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath) // no-op after a successful rename; cleans up early returns
+	defer os.Remove(tmpPath) // no operation after a successful rename; cleans up early returns
 	if _, err := tmp.Write(append(header, b...)); err != nil {
 		tmp.Close()
 		return err
 	}
-	// Sync before the rename: rename is metadata-only, so a power loss right
-	// after Save could otherwise journal the rename ahead of the data and
-	// leave the truncated config.yaml the crash-safety above promises away.
+	// Flush file contents before publishing the replacement.
 	if err := tmp.Sync(); err != nil {
 		tmp.Close()
 		return err
@@ -333,7 +232,7 @@ func (c *Config) ActiveProfile() *Profile {
 	return c.Models[c.Active]
 }
 
-// ActiveURL is the endpoint every dial-out uses: the runtime override if set,
+// ActiveURL is the endpoint every dial out uses: the runtime override if set,
 // else the active profile's URL. Use this over ActiveProfile().URL so
 // CODEHAMR_URL doesn't leak back into Save.
 func (c *Config) ActiveURL() string {
@@ -350,7 +249,7 @@ func (c *Config) ModelNames() []string {
 }
 
 // SetActive switches the active profile and persists. Fails on an unknown name,
-// no silent coercion. On Save failure it reverts in-memory Active so the live
+// no silent coercion. On Save failure it reverts in memory Active so the live
 // model and config.yaml stay in lockstep; otherwise the switch would stick this
 // session but vanish on the next Bootstrap.
 func (c *Config) SetActive(name string) error {
