@@ -4,7 +4,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 PREFIX  ?= /usr/local
 
-.PHONY: build run install loc
+.PHONY: build run install loc demo demo-record
 
 build:
 	@mkdir -p bin
@@ -33,3 +33,11 @@ loc:
 	@find . -type f -name '*.go' \
 	    -not -path './bin/*' -not -path './.git/*' \
 	    -exec wc -l {} + | tail -n 1 | awk '{print $$1 " lines of Go"}'
+
+# Rebuild the README animation from its compact terminal frames.
+demo:
+	python3 media/render.py
+
+# Record a real Qwen run in a temporary project, then render it.
+demo-record:
+	python3 media/render.py --record

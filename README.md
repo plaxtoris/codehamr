@@ -4,7 +4,7 @@ A small, standalone coding agent for the terminal, released under the MIT licens
 Connect a local model server or an API provider of your choice. No project account
 or subscription is required.
 
-![codehamr demo](codehamr.gif)
+![codehamr demo with qwen3.8](media/codehamr.gif)
 
 The agent works through four tools: `bash`, `read_file`, `write_file`, and
 `edit_file`. It reads your project, makes changes, runs checks, and replies when
@@ -158,6 +158,10 @@ go run ./cmd/codehamr --help
 `make build` produces binaries for Linux, macOS, and Windows on amd64 and arm64.
 `make run` builds and runs the host binary. `make install` installs into
 `$(PREFIX)/bin`, with `/usr/local` as the default prefix.
+
+`make demo` renders the README animation from compact terminal frames in
+`media/`. `make demo-record` records a new Qwen session with the current UI.
+See the [demo instructions](media/README.md) for requirements and source files.
 
 The optional OpenRouter integration test sends real requests using the
 `openrouter` profile in a local project. It checks activation, a structured tool
